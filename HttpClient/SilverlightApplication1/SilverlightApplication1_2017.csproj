@@ -40,7 +40,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Net.Http" Version="2.2.29" />
     <PackageReference Include="Microsoft.Bcl.Async" Version="1.0.168" />
-    <PackageReference Include="OpenRiaServices.Client" Version="4.5.1" />
+    <PackageReference Include="OpenRiaServices.Client" Version="4.5.3" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.ComponentModel.DataAnnotations" />
