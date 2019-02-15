@@ -163,9 +163,7 @@ namespace OpenRiaServices.DomainServices.Client.Web
                     var queryParts = (queryProperty != null) ? QuerySerializer.Serialize((IQueryable)queryProperty) : null;
                     var includeTotalCount = (bool?)includeTotalCountProperty;
 
-                    // Prepare the request message copy to be modified
-                    MessageBuffer buffer = request.CreateBufferedCopy(Int32.MaxValue);
-                    request = buffer.CreateMessage();
+                    // Prepare the request message copy to be modifie
                     var header = new QueryOptionsHeader(queryParts, includeTotalCount == true);
                     request.Headers.Add(header);
                 }
