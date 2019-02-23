@@ -243,7 +243,7 @@ namespace HttpClientExampleClient
 
         private void OpenRiaWeb_Click(object sender, RoutedEventArgs e)
         {
-            DomainContext.DomainClientFactory = new OpenRiaServices.DomainServices.Client.Web.SoapDomainClientFactory()
+            DomainContext.DomainClientFactory = new OpenRiaServices.DomainServices.Client.Web.WebDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
                 CookieContainer = _cookieContainer,
