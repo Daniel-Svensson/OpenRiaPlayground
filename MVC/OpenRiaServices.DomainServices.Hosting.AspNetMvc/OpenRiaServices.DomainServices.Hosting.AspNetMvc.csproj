@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\OpenRiaServices.DomainControllers.Server\Common\CommonWebApiResources.Designer.cs" Link="CommonWebApiResources.Designer.cs">
+      <DependentUpon>CommonWebApiResources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+    </Compile>
+    <Compile Include="..\OpenRiaServices.DomainControllers.Server\Common\Error.cs" Link="Error.cs" />
+    <Compile Include="..\OpenRiaServices.DomainControllers.Server\Common\TaskHelpers.cs" Link="TaskHelpers.cs" />
+    <Compile Include="..\OpenRiaServices.DomainControllers.Server\Common\TaskHelpersExtensions.cs" Link="TaskHelpersExtensions.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\OpenRiaServices.DomainControllers.Server\Common\CommonWebApiResources.resx" Link="CommonWebApiResources.resx">
+      <LastGenOutput>CommonWebApiResources.Designer.cs</LastGenOutput>
+      <Generator>ResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <!--<PackageReference Include="Microsoft.AspNet.Mvc" Version="5.2.7" />-->
+    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.7" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.OData" Version="5.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\OpenRiaServices\OpenRiaServices.DomainServices.Server\Framework\OpenRiaServices.DomainServices.Server.csproj" />
+  </ItemGroup>
+
+</Project>

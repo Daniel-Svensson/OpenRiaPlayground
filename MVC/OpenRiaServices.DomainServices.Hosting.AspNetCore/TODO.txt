@@ -1,0 +1,13 @@
+* ActionFilter for queries ?
+* use odata for querying ?
+Queries
+** Convert result to EntityQuery (formatter or action filter)
+
+* ActionFilter for exception handling
+* ApplicationModelProvider ? 
+
+* Authorization for Submit
+* Validation for Submit
+
+Prio 3:
+* ActionFitler for CUD operations which invokes SubmitChanges
