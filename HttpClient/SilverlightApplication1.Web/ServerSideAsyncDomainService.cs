@@ -127,7 +127,8 @@ namespace TestDomainServices
             throw new Exception("Not allowed");
         }
 
-        [RequiresRole("DUMMY")]
+        //[RequiresRole("DUMMY")]
+        [RequiresAuthentication]
         public IQueryable<RangeItem> GetRangeWithNotAuthorized()
         {
             return null;

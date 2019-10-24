@@ -29,7 +29,12 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="OpenRiaServices.Client" Version="4.5.3" />
-    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="4.5.2" />
+    <PackageReference Include="OpenRiaServices.Client" Version="4.6.3" />
+    <PackageReference Include="OpenRiaServices.Client.CodeGen" Version="4.6.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="OpenRiaServices.Client.Core" Version="4.6.3" />
+    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="4.6.0" />
   </ItemGroup>
 </Project>

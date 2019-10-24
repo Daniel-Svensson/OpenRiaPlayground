@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace OpenRiaServices.DomainServices.Client.PortableWeb
 {
-    public partial class WebApiDomainClient : TaskBasedDomainClient
+    public partial class WebApiDomainClient : DomainClient
     {
         private static readonly Dictionary<Type, Dictionary<Type, DataContractSerializer>> s_globalSerializerCache = new Dictionary<Type, Dictionary<Type, DataContractSerializer>>();
         private static readonly DataContractSerializer s_faultSerializer = new DataContractSerializer(typeof(DomainServiceFault));
@@ -52,7 +52,7 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
         /// <returns>
         /// An asynchronous result that identifies this invocation.
         /// </returns>
-        protected override async Task<InvokeCompletedResult> InvokeCoreAsync(InvokeArgs invokeArgs, CancellationToken cancellationToken)
+        protected override async Task<InvokeCompletedResult> InvokeAsyncCore(InvokeArgs invokeArgs, CancellationToken cancellationToken)
         {
             var response = await ExecuteRequestAsync(invokeArgs.OperationName, invokeArgs.HasSideEffects, invokeArgs.Parameters, queryOptions: null, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -89,7 +89,7 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
         /// <returns>
         /// An asynchronous result that identifies this submit request.
         /// </returns>
-        protected override async Task<SubmitCompletedResult> SubmitCoreAsync(EntityChangeSet changeSet, CancellationToken cancellationToken)
+        protected override async Task<SubmitCompletedResult> SubmitAsyncCore(EntityChangeSet changeSet, CancellationToken cancellationToken)
         {
             const string operationName = "SubmitChanges";
             var entries = changeSet.GetChangeSetEntries().ToList();
@@ -120,7 +120,7 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
         /// <returns>
         /// An asynchronous result that identifies this query.
         /// </returns>
-        protected override async Task<QueryCompletedResult> QueryCoreAsync(EntityQuery query, CancellationToken cancellationToken)
+        protected override async Task<QueryCompletedResult> QueryAsyncCore(EntityQuery query, CancellationToken cancellationToken)
         {
             List<ServiceQueryPart> queryOptions = query.Query != null ? QuerySerializer.Serialize(query.Query) : null;
 
