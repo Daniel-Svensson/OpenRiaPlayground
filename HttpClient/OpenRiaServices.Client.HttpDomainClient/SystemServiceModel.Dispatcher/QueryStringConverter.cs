@@ -27,9 +27,9 @@
 //
 using System;
 using System.Globalization;
-using OpenRiaServices.DomainServices;
+using OpenRiaServices;
 
-namespace System.ServiceModel.Dispatcher
+namespace Mono.System.ServiceModel.Dispatcher
 {
     /// <summary>
     /// Mono's query string converter, with minor changes

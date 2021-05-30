@@ -4,22 +4,23 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 
-namespace OpenRiaServices.DomainServices.Client.PortableWeb
+namespace OpenRiaServices.Client.HttpDomainClient
 {
-    public class WebApiDomainClientFactory : DomainClientFactory
+    public class BinaryHttpDomainClientFactory
+        : DomainClientFactory
     {
-        public WebApiDomainClientFactory()
+        public BinaryHttpDomainClientFactory()
         {
             HttpClientHandler = new HttpClientHandler()
-                {
-                    CookieContainer = new System.Net.CookieContainer(),
-                    UseCookies = true
-                };
+            {
+                CookieContainer = new System.Net.CookieContainer(),
+                UseCookies = true
+            };
         }
 
         protected override DomainClient CreateDomainClientCore(Type serviceContract, Uri serviceUri, bool requiresSecureEndpoint)
         {
-            return new WebApiDomainClient(serviceContract, serviceUri, HttpClientHandler);
+            return new BinaryHttpDomainClient(serviceContract, serviceUri, HttpClientHandler);
         }
 
         public HttpMessageHandler HttpClientHandler { get; set; }

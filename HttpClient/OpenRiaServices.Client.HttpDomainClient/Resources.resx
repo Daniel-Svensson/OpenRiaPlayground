@@ -117,34 +117,34 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="ApplicationServices_CannotInitializeDomainContext" xml:space="preserve">
+  <data name="Authentication_CannotInitializeDomainContext" xml:space="preserve">
     <value>The DomainContextType is null or invalid and there are no contexts generated from AuthenticationBase&lt;T&gt;.</value>
   </data>
-  <data name="ApplicationServices_CannotInitializeUser" xml:space="preserve">
+  <data name="Authentication_CannotInitializeUser" xml:space="preserve">
     <value>The User type must extend UserBase and provide a default constructor.</value>
   </data>
-  <data name="ApplicationServices_CannotSaveAnonymous" xml:space="preserve">
+  <data name="Authentication_CannotSaveAnonymous" xml:space="preserve">
     <value>The current user is anonymous. Data may only be saved for authenticated users.</value>
   </data>
-  <data name="ApplicationServices_LoadNoUser" xml:space="preserve">
+  <data name="Authentication_LoadNoUser" xml:space="preserve">
     <value>GetUser should have returned a single user.</value>
   </data>
-  <data name="ApplicationServices_LogoutNoUser" xml:space="preserve">
+  <data name="Authentication_LogoutNoUser" xml:space="preserve">
     <value>Logout should have returned a single, anonymous user.</value>
   </data>
-  <data name="ApplicationServices_NoLoadUserMethod" xml:space="preserve">
+  <data name="Authentication_NoLoadUserMethod" xml:space="preserve">
     <value>Derived service does not contain a LoadUser method.</value>
   </data>
-  <data name="ApplicationServices_SaveErrors" xml:space="preserve">
+  <data name="Authentication_SaveErrors" xml:space="preserve">
     <value>Errors occurred while submitting the user changes.</value>
   </data>
-  <data name="ApplicationServices_ServiceMustNotBeActive" xml:space="preserve">
+  <data name="Authentication_ServiceMustNotBeActive" xml:space="preserve">
     <value>The service must be inactive to update state.</value>
   </data>
-  <data name="ApplicationServices_WANoLogin" xml:space="preserve">
+  <data name="Authentication_WANoLogin" xml:space="preserve">
     <value>Windows authentication does not support logging in.</value>
   </data>
-  <data name="ApplicationServices_WANoLogout" xml:space="preserve">
+  <data name="Authentication_WANoLogout" xml:space="preserve">
     <value>Windows authentication does not support logging out.</value>
   </data>
   <data name="DomainClient_UnexpectedHttpStatusCode" xml:space="preserve">

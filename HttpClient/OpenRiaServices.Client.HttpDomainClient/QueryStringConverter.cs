@@ -6,10 +6,10 @@ using System.Text;
 using System.Reflection;
 using System.Xml;
 
-namespace OpenRiaServices.DomainServices.Client.PortableWeb
+namespace OpenRiaServices.Client.HttpDomainClient
 {
     /// <summary>
-    /// This file is based on the OpenRiaServices.DomainServices.Client/Hosting.WebHttpQueryStringConverter 
+    /// This file is based on the OpenRiaServices.Client/Hosting.WebHttpQueryStringConverter 
     /// </summary>
     static class QueryStringConverter
     {
@@ -24,9 +24,9 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
                 throw new ArgumentNullException("parameter");
             }
 
-            if (System.ServiceModel.Dispatcher.QueryStringConverter.CanConvert(parameterType))
+            if (Mono.System.ServiceModel.Dispatcher.QueryStringConverter.CanConvert(parameterType))
             {
-                return System.ServiceModel.Dispatcher.QueryStringConverter.ConvertValueToString(parameter, parameterType);
+                return Mono.System.ServiceModel.Dispatcher.QueryStringConverter.ConvertValueToString(parameter, parameterType);
             }
             using (MemoryStream ms = new MemoryStream())
             {

@@ -11,15 +11,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OpenRiaServices.DomainServices.Client.PortableWeb
+namespace OpenRiaServices.Client.HttpDomainClient
 {
-    public partial class WebApiDomainClient : DomainClient
+    public partial class BinaryHttpDomainClient : DomainClient
     {
         private static readonly Dictionary<Type, Dictionary<Type, DataContractSerializer>> s_globalSerializerCache = new Dictionary<Type, Dictionary<Type, DataContractSerializer>>();
         private static readonly DataContractSerializer s_faultSerializer = new DataContractSerializer(typeof(DomainServiceFault));
         Dictionary<Type, DataContractSerializer> _serializerCache;
 
-        public WebApiDomainClient(Type serviceInterface, Uri baseUri, HttpMessageHandler handler)
+        public BinaryHttpDomainClient(Type serviceInterface, Uri baseUri, HttpMessageHandler handler)
         {
             ServiceInterfaceType = serviceInterface;
             HttpClient = new HttpClient(handler, disposeHandler: false)
@@ -80,10 +80,10 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
         }
 
         /// <summary>
-        /// Method called by the framework to asynchronously process the specified <see cref="T:OpenRiaServices.DomainServices.Client.EntityChangeSet" />.
+        /// Method called by the framework to asynchronously process the specified <see cref="T:OpenRiaServices.Client.EntityChangeSet" />.
         /// Overrides should not call the base method.
         /// </summary>
-        /// <param name="changeSet">The <see cref="T:OpenRiaServices.DomainServices.Client.EntityChangeSet" /> to submit to the DomainService.</param>
+        /// <param name="changeSet">The <see cref="T:OpenRiaServices.Client.EntityChangeSet" /> to submit to the DomainService.</param>
         /// <param name="callback">The callback to invoke when the submit has been executed.</param>
         /// <param name="userState">Optional user state associated with this operation.</param>
         /// <returns>
@@ -270,7 +270,7 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
         /// <param name="result">The result object which contains information about which operation was performed.</param>
         /// <param name="returnType">Type which should be returned.</param>
         /// <returns></returns>
-        /// <exception cref="OpenRiaServices.DomainServices.Client.DomainOperationException">On server errors which did not produce expected output</exception>
+        /// <exception cref="OpenRiaServices.Client.DomainOperationException">On server errors which did not produce expected output</exception>
         /// <exception cref="FaultException{DomainServiceFault}">If server returned a DomainServiceFault</exception>
         private object ReadResponse(HttpResponseMessage response, string operationName, Type returnType)
         {
@@ -321,7 +321,7 @@ namespace OpenRiaServices.DomainServices.Client.PortableWeb
         /// <param name="reader">The reader.</param>
         /// <param name="operationName">Name of the operation.</param>
         /// <param name="postfix">The postfix.</param>
-        /// <exception cref="OpenRiaServices.DomainServices.Client.DomainOperationException">If reader is not at the expected xml element</exception>
+        /// <exception cref="OpenRiaServices.Client.DomainOperationException">If reader is not at the expected xml element</exception>
         private static void VerifyReaderIsAtNode(System.Xml.XmlDictionaryReader reader, string operationName, string postfix)
         {
             // localName should be operationName + postfix

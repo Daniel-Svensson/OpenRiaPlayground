@@ -1,14 +1,10 @@
 ﻿
 using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Linq;
 using System.Net.Http;
 using System.Windows;
-using OpenRiaServices.DomainServices.Client;
-using OpenRiaServices.DomainServices.Client.ApplicationServices;
-using OpenRiaServices.DomainServices.Client.PortableWeb;
-using OpenRiaServices.DomainServices.Client.Web;
+using OpenRiaServices.Client;
+using OpenRiaServices.Client.Authentication;
+using OpenRiaServices.Client.HttpDomainClient;
 
 namespace HttpClientExampleClient
 {
@@ -25,7 +21,7 @@ namespace HttpClientExampleClient
         private void App_Startup(object sender, StartupEventArgs e)
         {
             // Web client 
-            DomainContext.DomainClientFactory = new WebApiDomainClientFactory()
+            DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 HttpClientHandler = new HttpClientHandler()
                 {
@@ -37,7 +33,7 @@ namespace HttpClientExampleClient
 
 
             // Enable HTTP/2 support
-            DomainContext.DomainClientFactory = new WebApiDomainClientFactory()
+            DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 HttpClientHandler = new Http2CustomHandler()
                 {
@@ -48,7 +44,7 @@ namespace HttpClientExampleClient
             };
 
             /*
-            DomainContext.DomainClientFactory = new OpenRiaServices.DomainServices.Client.Web.WebDomainClientFactory()
+            DomainContext.DomainClientFactory = new OpenRiaServices.Client.Web.WebDomainClientFactory()
             {
                 // Uncomment this to debug in fiddler
                 // ServerBaseUri = new Uri("http://localhost.fiddler:51359/ClientBin/", UriKind.Absolute)

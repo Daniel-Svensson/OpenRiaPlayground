@@ -13,9 +13,9 @@ namespace HttpClientExampleClient
     using System.ComponentModel.DataAnnotations;
     using System.Linq;
     using System.Threading.Tasks;
-    using OpenRiaServices.DomainServices;
-    using OpenRiaServices.DomainServices.Client;
-    using OpenRiaServices.DomainServices.Client.ApplicationServices;
+    using OpenRiaServices;
+    using OpenRiaServices.Client;
+    using OpenRiaServices.Client.Authentication;
 
 
     /// <summary>

@@ -3,9 +3,11 @@ using System.Globalization;
 using System.Runtime.Serialization;
 
 #if SERVERFX
-namespace OpenRiaServices.DomainServices.Hosting
+using OpenRiaServices.Hosting.Wcf;
+
+namespace OpenRiaServices.Hosting
 #else
-namespace OpenRiaServices.DomainServices.Client
+namespace OpenRiaServices.Client
 #endif
 {
     /// <summary>
@@ -33,17 +35,17 @@ namespace OpenRiaServices.DomainServices.Client
         {
             if (queryOperator == null)
             {
-                throw new ArgumentNullException("queryOperator");
+                throw new ArgumentNullException(nameof(queryOperator));
             }
             if (expression == null)
             {
-                throw new ArgumentNullException("expression");
+                throw new ArgumentNullException(nameof(expression));
             }
 
             if (queryOperator != "where" && queryOperator != "orderby" &&
                queryOperator != "skip" && queryOperator != "take")
             {
-                throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, Resource.Query_InvalidOperator, queryOperator), "queryOperator");
+                throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, Resource.Query_InvalidOperator, queryOperator), nameof(queryOperator));
             }
 
             this._queryOperator = queryOperator;

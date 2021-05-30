@@ -4,19 +4,19 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace OpenRiaServices.DomainServices.Client.PortableWeb
+namespace OpenRiaServices.Client.HttpDomainClient
 {
 
-    public partial class WebApiDomainClient
+    public partial class BinaryHttpDomainClient
     {
         class BinaryXmlContent : HttpContent
         {
-            private readonly WebApiDomainClient domainClient;
+            private readonly BinaryHttpDomainClient domainClient;
             private readonly string operationName;
             private readonly IDictionary<string, object> parameters;
             private readonly List<ServiceQueryPart> queryOptions;
 
-            public BinaryXmlContent(WebApiDomainClient domainClient,
+            public BinaryXmlContent(BinaryHttpDomainClient domainClient,
                 string operationName, IDictionary<string, object> parameters, List<ServiceQueryPart> queryOptions)
             {
                 this.domainClient = domainClient;

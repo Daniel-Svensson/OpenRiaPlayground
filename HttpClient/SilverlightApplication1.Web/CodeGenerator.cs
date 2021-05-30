@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Web;
-using OpenRiaServices.DomainServices.Tools;
-using OpenRiaServices.DomainServices.Tools.TextTemplate;
-using OpenRiaServices.DomainServices.Tools.TextTemplate.CSharpGenerators;
+using OpenRiaServices.Tools;
+using OpenRiaServices.Tools.TextTemplate;
+using OpenRiaServices.Tools.TextTemplate.CSharpGenerators;
 
 namespace SilverlightApplication1.Web
 {

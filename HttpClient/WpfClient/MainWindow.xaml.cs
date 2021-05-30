@@ -1,22 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using OpenRiaServices.Client;
+using OpenRiaServices.Client.Authentication;
+using OpenRiaServices.Client.HttpDomainClient;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using OpenRiaServices.DomainServices.Client;
-using OpenRiaServices.DomainServices.Client.ApplicationServices;
-using OpenRiaServices.DomainServices.Client.PortableWeb;
 using TestDomainServices;
 
 namespace HttpClientExampleClient
@@ -243,7 +233,7 @@ namespace HttpClientExampleClient
 
         private void OpenRiaWeb_Click(object sender, RoutedEventArgs e)
         {
-            DomainContext.DomainClientFactory = new OpenRiaServices.DomainServices.Client.Web.WebDomainClientFactory()
+            DomainContext.DomainClientFactory = new OpenRiaServices.Client.Web.WebDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
                 CookieContainer = _cookieContainer,
@@ -253,10 +243,10 @@ namespace HttpClientExampleClient
 
         private void OpenRiaPortableWeb_Click(object sender, RoutedEventArgs e)
         {
-            DomainContext.DomainClientFactory = new WebApiDomainClientFactory()
+            DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
-                HttpClientHandler = new System.Net.Http.HttpClientHandler()
+                HttpClientHandler = new HttpClientHandler()
                 {
                     CookieContainer = _cookieContainer,
                     UseCookies = true,
@@ -279,7 +269,7 @@ namespace HttpClientExampleClient
         {
 
             // Enable HTTP/2 support
-            DomainContext.DomainClientFactory = new WebApiDomainClientFactory()
+            DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
                 HttpClientHandler = new Http2CustomHandler()
@@ -298,7 +288,7 @@ namespace HttpClientExampleClient
             if (((RadioButton)sender).IsChecked != true)
                 return;
 
-            DomainContext.DomainClientFactory = new OpenRiaServices.DomainServices.Client.Web.SoapDomainClientFactory()
+            DomainContext.DomainClientFactory = new OpenRiaServices.Client.Web.SoapDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
             };

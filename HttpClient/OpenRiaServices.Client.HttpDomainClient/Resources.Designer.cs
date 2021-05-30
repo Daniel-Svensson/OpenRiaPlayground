@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace OpenRiaServices.DomainServices.Client {
+namespace OpenRiaServices.Client {
     using System;
     using System.Reflection;
     
@@ -40,7 +40,7 @@ namespace OpenRiaServices.DomainServices.Client {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("OpenRiaServices.DomainServices.Client.PortableWeb.Resources", typeof(Resources).GetTypeInfo().Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("OpenRiaServices.Client.HttpDomainClient.Resources", typeof(Resources).GetTypeInfo().Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
@@ -64,90 +64,90 @@ namespace OpenRiaServices.DomainServices.Client {
         /// <summary>
         ///   Looks up a localized string similar to The DomainContextType is null or invalid and there are no contexts generated from AuthenticationBase&lt;T&gt;..
         /// </summary>
-        internal static string ApplicationServices_CannotInitializeDomainContext {
+        internal static string Authentication_CannotInitializeDomainContext {
             get {
-                return ResourceManager.GetString("ApplicationServices_CannotInitializeDomainContext", resourceCulture);
+                return ResourceManager.GetString("Authentication_CannotInitializeDomainContext", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to The User type must extend UserBase and provide a default constructor..
         /// </summary>
-        internal static string ApplicationServices_CannotInitializeUser {
+        internal static string Authentication_CannotInitializeUser {
             get {
-                return ResourceManager.GetString("ApplicationServices_CannotInitializeUser", resourceCulture);
+                return ResourceManager.GetString("Authentication_CannotInitializeUser", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to The current user is anonymous. Data may only be saved for authenticated users..
         /// </summary>
-        internal static string ApplicationServices_CannotSaveAnonymous {
+        internal static string Authentication_CannotSaveAnonymous {
             get {
-                return ResourceManager.GetString("ApplicationServices_CannotSaveAnonymous", resourceCulture);
+                return ResourceManager.GetString("Authentication_CannotSaveAnonymous", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to GetUser should have returned a single user..
         /// </summary>
-        internal static string ApplicationServices_LoadNoUser {
+        internal static string Authentication_LoadNoUser {
             get {
-                return ResourceManager.GetString("ApplicationServices_LoadNoUser", resourceCulture);
+                return ResourceManager.GetString("Authentication_LoadNoUser", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Logout should have returned a single, anonymous user..
         /// </summary>
-        internal static string ApplicationServices_LogoutNoUser {
+        internal static string Authentication_LogoutNoUser {
             get {
-                return ResourceManager.GetString("ApplicationServices_LogoutNoUser", resourceCulture);
+                return ResourceManager.GetString("Authentication_LogoutNoUser", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Derived service does not contain a LoadUser method..
         /// </summary>
-        internal static string ApplicationServices_NoLoadUserMethod {
+        internal static string Authentication_NoLoadUserMethod {
             get {
-                return ResourceManager.GetString("ApplicationServices_NoLoadUserMethod", resourceCulture);
+                return ResourceManager.GetString("Authentication_NoLoadUserMethod", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Errors occurred while submitting the user changes..
         /// </summary>
-        internal static string ApplicationServices_SaveErrors {
+        internal static string Authentication_SaveErrors {
             get {
-                return ResourceManager.GetString("ApplicationServices_SaveErrors", resourceCulture);
+                return ResourceManager.GetString("Authentication_SaveErrors", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to The service must be inactive to update state..
         /// </summary>
-        internal static string ApplicationServices_ServiceMustNotBeActive {
+        internal static string Authentication_ServiceMustNotBeActive {
             get {
-                return ResourceManager.GetString("ApplicationServices_ServiceMustNotBeActive", resourceCulture);
+                return ResourceManager.GetString("Authentication_ServiceMustNotBeActive", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Windows authentication does not support logging in..
         /// </summary>
-        internal static string ApplicationServices_WANoLogin {
+        internal static string Authentication_WANoLogin {
             get {
-                return ResourceManager.GetString("ApplicationServices_WANoLogin", resourceCulture);
+                return ResourceManager.GetString("Authentication_WANoLogin", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Windows authentication does not support logging out..
         /// </summary>
-        internal static string ApplicationServices_WANoLogout {
+        internal static string Authentication_WANoLogout {
             get {
-                return ResourceManager.GetString("ApplicationServices_WANoLogout", resourceCulture);
+                return ResourceManager.GetString("Authentication_WANoLogout", resourceCulture);
             }
         }
         
