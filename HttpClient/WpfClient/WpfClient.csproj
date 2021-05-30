@@ -3,7 +3,6 @@
     <TargetFrameworks>net472</TargetFrameworks>
     <RootNamespace>HttpClientExampleClient</RootNamespace>
     <OutputType>WinExe</OutputType>
-    <LinkedOpenRiaServerProject>..\SilverlightApplication1.Web\SilverlightApplication1.Web.csproj</LinkedOpenRiaServerProject>
     <ExtrasEnableWpfProjectSetup>true</ExtrasEnableWpfProjectSetup>
   </PropertyGroup>
   
@@ -25,16 +24,12 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="OpenRiaServices.Client" Version="5.0.0" />
-    <PackageReference Include="OpenRiaServices.Client.CodeGen" Version="5.0.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="OpenRiaServices.Client.Core" Version="5.0.0" />
     <PackageReference Include="System.Net.Http.WinHttpHandler" Version="5.0.0" />
   </ItemGroup>
   
   <ItemGroup>
+    <ProjectReference Include="..\HttpClientExampleClient.Core\HttpClientExampleClient.Core.csproj" />
     <ProjectReference Include="..\OpenRiaServices.Client.HttpDomainClient\OpenRiaServices.Client.HttpDomainClient.csproj" />
   </ItemGroup>
 </Project>
