@@ -10,19 +10,24 @@ namespace OpenRiaServices.Client.HttpDomainClient
         : DomainClientFactory
     {
         public BinaryHttpDomainClientFactory()
-        {
-            HttpClientHandler = new HttpClientHandler()
+            : this(new HttpClientHandler()
             {
                 CookieContainer = new System.Net.CookieContainer(),
                 UseCookies = true
-            };
+            })
+        {
+        }
+
+        public BinaryHttpDomainClientFactory(HttpMessageHandler messageHandler)
+        {
+            HttpMessageHandler = messageHandler;
         }
 
         protected override DomainClient CreateDomainClientCore(Type serviceContract, Uri serviceUri, bool requiresSecureEndpoint)
         {
-            return new BinaryHttpDomainClient(serviceContract, serviceUri, HttpClientHandler);
+            return new BinaryHttpDomainClient(serviceContract, serviceUri, HttpMessageHandler);
         }
 
-        public HttpMessageHandler HttpClientHandler { get; set; }
+        public HttpMessageHandler HttpMessageHandler { get; set; }
     }
 }

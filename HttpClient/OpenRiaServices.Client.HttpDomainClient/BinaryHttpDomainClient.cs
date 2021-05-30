@@ -274,7 +274,10 @@ namespace OpenRiaServices.Client.HttpDomainClient
         /// <exception cref="FaultException{DomainServiceFault}">If server returned a DomainServiceFault</exception>
         private object ReadResponse(HttpResponseMessage response, string operationName, Type returnType)
         {
-            if (!response.IsSuccessStatusCode)
+            // TODO: OpenRia 5.0 returns different status codes
+            // Need to read content and parse it even if status code is not 200
+            // It would make sens to one  check content type and only pase on msbin
+            if (!response.IsSuccessStatusCode && response.Content.Headers.ContentType.MediaType != "application/msbin1")
             {
                 var message = string.Format(Resources.DomainClient_UnexpectedHttpStatusCode, (int)response.StatusCode, response.StatusCode);
 

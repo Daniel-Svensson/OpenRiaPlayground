@@ -23,7 +23,7 @@ namespace HttpClientExampleClient
             // Web client 
             DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
-                HttpClientHandler = new HttpClientHandler()
+                HttpMessageHandler = new HttpClientHandler()
                 {
                     UseProxy = true,
                     AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip
@@ -35,7 +35,7 @@ namespace HttpClientExampleClient
             // Enable HTTP/2 support
             DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
-                HttpClientHandler = new Http2CustomHandler()
+                HttpMessageHandler = new Http2CustomHandler()
                 {
                     AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip,
                     WindowsProxyUsePolicy = WindowsProxyUsePolicy.UseWinInetProxy,

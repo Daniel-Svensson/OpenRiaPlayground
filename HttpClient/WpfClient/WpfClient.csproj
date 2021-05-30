@@ -1,6 +1,6 @@
 ﻿<Project Sdk="MSBuild.Sdk.Extras/1.6.65">
   <PropertyGroup>
-    <TargetFrameworks>net472</TargetFrameworks>
+    <TargetFrameworks>net48</TargetFrameworks>
     <RootNamespace>HttpClientExampleClient</RootNamespace>
     <OutputType>WinExe</OutputType>
     <ExtrasEnableWpfProjectSetup>true</ExtrasEnableWpfProjectSetup>
@@ -26,6 +26,8 @@
   <ItemGroup>
     <PackageReference Include="OpenRiaServices.Client.Core" Version="5.0.0" />
     <PackageReference Include="System.Net.Http.WinHttpHandler" Version="5.0.0" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="System.ServiceModel.Primitives" Version="4.8.1" />
   </ItemGroup>
   
   <ItemGroup>

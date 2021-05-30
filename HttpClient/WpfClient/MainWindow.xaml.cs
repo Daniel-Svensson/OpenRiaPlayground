@@ -246,7 +246,7 @@ namespace HttpClientExampleClient
             DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
-                HttpClientHandler = new HttpClientHandler()
+                HttpMessageHandler = new HttpClientHandler()
                 {
                     CookieContainer = _cookieContainer,
                     UseCookies = true,
@@ -272,7 +272,7 @@ namespace HttpClientExampleClient
             DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
-                HttpClientHandler = new Http2CustomHandler()
+                HttpMessageHandler = new Http2CustomHandler()
                 {
                     CookieContainer = _cookieContainer, 
                     CookieUsePolicy = CookieUsePolicy.UseSpecifiedCookieContainer,
