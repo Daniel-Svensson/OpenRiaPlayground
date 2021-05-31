@@ -13,19 +13,18 @@ using System.Threading.Tasks;
 
 namespace OpenRiaServices.Client.HttpDomainClient
 {
+    // TODO: Extract serialization to separate class (hierarchy) Serializer / SerializerCache
+    // Pass in HttpDomainClientFactory to ctor,
+    // pass in HttpClient ?
     public partial class BinaryHttpDomainClient : DomainClient
     {
         private static readonly Dictionary<Type, Dictionary<Type, DataContractSerializer>> s_globalSerializerCache = new Dictionary<Type, Dictionary<Type, DataContractSerializer>>();
         private static readonly DataContractSerializer s_faultSerializer = new DataContractSerializer(typeof(DomainServiceFault));
         Dictionary<Type, DataContractSerializer> _serializerCache;
 
-        public BinaryHttpDomainClient(Type serviceInterface, Uri baseUri, HttpMessageHandler handler)
+        public BinaryHttpDomainClient(HttpClient httpClient, Type serviceInterface)
         {
-            ServiceInterfaceType = serviceInterface;
-            HttpClient = new HttpClient(handler, disposeHandler: false)
-            {
-                BaseAddress = new Uri(baseUri.AbsoluteUri + "/binary/", UriKind.Absolute),
-            };
+            HttpClient = httpClient;
 
             lock (s_globalSerializerCache)
             {
@@ -36,8 +35,6 @@ namespace OpenRiaServices.Client.HttpDomainClient
                 }
             }
         }
-
-        internal Type ServiceInterfaceType { get; private set; }
 
         HttpClient HttpClient { get; set; }
 
@@ -62,7 +59,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
 
             try
             {
-                returnValue = ReadResponse(response, invokeArgs.OperationName, invokeArgs.ReturnType);
+                returnValue = await ReadResponseAsync(response, invokeArgs.OperationName, invokeArgs.ReturnType)
+                    .ConfigureAwait(false);
             }
             catch (FaultException<DomainServiceFault> fe)
             {
@@ -102,7 +100,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
 
             try
             {
-                var returnValue = (IEnumerable<ChangeSetEntry>)ReadResponse(response, operationName, typeof(IEnumerable<ChangeSetEntry>));
+                var returnValue = (IEnumerable<ChangeSetEntry>)await ReadResponseAsync(response, operationName, typeof(IEnumerable<ChangeSetEntry>))
+                    .ConfigureAwait(false);
                 return new SubmitCompletedResult(changeSet, returnValue ?? Enumerable.Empty<ChangeSetEntry>());
             }
             catch (FaultException<DomainServiceFault> fe)
@@ -141,7 +140,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
             try
             {
                 var queryType = typeof(QueryResult<>).MakeGenericType(query.EntityType);
-                var queryResult = (QueryResult)ReadResponse(response, query.QueryName, queryType);
+                var queryResult = (QueryResult)await ReadResponseAsync(response, query.QueryName, queryType)
+                    .ConfigureAwait(false);
                 if (queryResult != null)
                 {
                     return new QueryCompletedResult(
@@ -181,7 +181,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
         /// <param name="parameters">The parameters.</param>
         /// <param name="queryOptions">The query options.</param>
         private Task<HttpResponseMessage> ExecuteRequestAsync(string operationName, bool hasSideEffects, IDictionary<string, object> parameters,
-            List<ServiceQueryPart> queryOptions, 
+            List<ServiceQueryPart> queryOptions,
             CancellationToken cancellationToken)
         {
             Task<HttpResponseMessage> response = null;
@@ -209,10 +209,11 @@ namespace OpenRiaServices.Client.HttpDomainClient
         /// <returns></returns>
         private Task<HttpResponseMessage> PostAsync(string operationName, IDictionary<string, object> parameters, List<ServiceQueryPart> queryOptions, CancellationToken cancellationToken)
         {
-            // Keep reference to dictionary so that we can dispose of it correctly after the request has been posted
-            // otherwise there is a small risk that it will be finalized and that it might corrupt the stream
-            return HttpClient.PostAsync(operationName, new BinaryXmlContent(this, operationName, parameters, queryOptions), cancellationToken);
-
+            var request = new HttpRequestMessage(HttpMethod.Post, operationName)
+            {
+                Content = new BinaryXmlContent(this, operationName, parameters, queryOptions),
+            };
+            return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
 
         /// <summary>
@@ -225,7 +226,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
         private Task<HttpResponseMessage> GetAsync(string operationName, IDictionary<string, object> parameters, IList<ServiceQueryPart> queryOptions, CancellationToken cancellationToken)
         {
             int i = 0;
-            var uriBuilder = new StringBuilder();
+            var uriBuilder = new StringBuilder(256);
             uriBuilder.Append(operationName);
 
             // Parameters
@@ -258,7 +259,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
 
             // TODO: Switch to POST if uri becomes to long, we can do so by returning nul ...l
             var uri = uriBuilder.ToString();
-            return HttpClient.GetAsync(uri, cancellationToken);
+            return HttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
         #endregion
 
@@ -272,48 +273,53 @@ namespace OpenRiaServices.Client.HttpDomainClient
         /// <returns></returns>
         /// <exception cref="OpenRiaServices.Client.DomainOperationException">On server errors which did not produce expected output</exception>
         /// <exception cref="FaultException{DomainServiceFault}">If server returned a DomainServiceFault</exception>
-        private object ReadResponse(HttpResponseMessage response, string operationName, Type returnType)
+        private async Task<object> ReadResponseAsync(HttpResponseMessage response, string operationName, Type returnType)
         {
-            // TODO: OpenRia 5.0 returns different status codes
-            // Need to read content and parse it even if status code is not 200
-            // It would make sens to one  check content type and only pase on msbin
-            if (!response.IsSuccessStatusCode && response.Content.Headers.ContentType.MediaType != "application/msbin1")
+            // Always dispose using finally block below  respnse or we can leak connections
+            try
             {
-                var message = string.Format(Resources.DomainClient_UnexpectedHttpStatusCode, (int)response.StatusCode, response.StatusCode);
+                // TODO: OpenRia 5.0 returns different status codes
+                // Need to read content and parse it even if status code is not 200
+                // It would make sens to one  check content type and only pase on msbin
+                if (!response.IsSuccessStatusCode && response.Content.Headers.ContentType.MediaType != "application/msbin1")
+                {
+                    var message = string.Format(Resources.DomainClient_UnexpectedHttpStatusCode, (int)response.StatusCode, response.StatusCode);
 
-                if (response.StatusCode == HttpStatusCode.BadRequest)
-                    throw new DomainOperationException(message, OperationErrorStatus.NotSupported, (int)response.StatusCode, null);
-                else if (response.StatusCode == HttpStatusCode.Unauthorized)
-                    throw new DomainOperationException(message, OperationErrorStatus.Unauthorized, (int)response.StatusCode, null);
-                else
-                    throw new DomainOperationException(message, OperationErrorStatus.ServerError, (int)response.StatusCode, null);
+                    if (response.StatusCode == HttpStatusCode.BadRequest)
+                        throw new DomainOperationException(message, OperationErrorStatus.NotSupported, (int)response.StatusCode, null);
+                    else if (response.StatusCode == HttpStatusCode.Unauthorized)
+                        throw new DomainOperationException(message, OperationErrorStatus.Unauthorized, (int)response.StatusCode, null);
+                    else
+                        throw new DomainOperationException(message, OperationErrorStatus.ServerError, (int)response.StatusCode, null);
+                }
+
+                var stream = await response.Content.ReadAsStreamAsync();
+                using (var reader = System.Xml.XmlDictionaryReader.CreateBinaryReader(stream, System.Xml.XmlDictionaryReaderQuotas.Max))
+                {
+                    reader.Read();
+
+                    // Domain Fault
+                    if (reader.LocalName == "Fault")
+                    {
+                        throw ReadFaultException(reader, operationName);
+                    }
+                    else
+                    {
+                        // Validate that we are no on ****Response node
+                        VerifyReaderIsAtNode(reader, operationName, "Response");
+                        reader.ReadStartElement(); // Read to next which should be ****Result
+
+                        // Validate that we are no on ****Result node
+                        VerifyReaderIsAtNode(reader, operationName, "Result");
+
+                        var serializer = GetSerializer(returnType);
+                        return serializer.ReadObject(reader, verifyObjectName: false);
+                    }
+                }
             }
-
-            var streamTask = response.Content.ReadAsStreamAsync();
-            Debug.Assert(streamTask.IsCompleted, "Get/Post should use buffering so tream is ready");
-            var stream = streamTask.Result;
-
-            using (var reader = System.Xml.XmlDictionaryReader.CreateBinaryReader(stream, System.Xml.XmlDictionaryReaderQuotas.Max))
+            finally
             {
-                reader.Read();
-
-                // Domain Fault
-                if (reader.LocalName == "Fault")
-                {
-                    throw ReadFaultException(reader, operationName);
-                }
-                else
-                {
-                    // Validate that we are no on ****Response node
-                    VerifyReaderIsAtNode(reader, operationName, "Response");
-                    reader.ReadStartElement(); // Read to next which should be ****Result
-
-                    // Validate that we are no on ****Result node
-                    VerifyReaderIsAtNode(reader, operationName, "Result");
-
-                    var serializer = GetSerializer(returnType);
-                    return serializer.ReadObject(reader, verifyObjectName: false);
-                }
+                response.Dispose();
             }
         }
 

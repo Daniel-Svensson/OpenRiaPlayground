@@ -25,7 +25,12 @@ namespace OpenRiaServices.Client.HttpDomainClient
 
         protected override DomainClient CreateDomainClientCore(Type serviceContract, Uri serviceUri, bool requiresSecureEndpoint)
         {
-            return new BinaryHttpDomainClient(serviceContract, serviceUri, HttpMessageHandler);
+            var httpClient = new HttpClient(HttpMessageHandler, disposeHandler: false)
+            {
+                BaseAddress = new Uri(serviceUri.AbsoluteUri + "/binary/", UriKind.Absolute),
+            };
+
+            return new BinaryHttpDomainClient(httpClient, serviceContract);
         }
 
         public HttpMessageHandler HttpMessageHandler { get; set; }
