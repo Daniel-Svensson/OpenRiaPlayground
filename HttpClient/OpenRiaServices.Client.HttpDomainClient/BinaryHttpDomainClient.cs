@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -18,9 +17,15 @@ namespace OpenRiaServices.Client.HttpDomainClient
     // pass in HttpClient ?
     public partial class BinaryHttpDomainClient : DomainClient
     {
+        /// ResponseContentRead seems to give better results on .Net framework for local network with low latency and high bandwidth
+        /// This is probably due to less kernel time
+        /// It would be good to do measurements on .net core as well as over the internet
+        /// - response headers read should teoretically give lower latency since result can be 
+        /// deserialized as content is received
+        private const HttpCompletionOption DefaultHttpCompletionOption = HttpCompletionOption.ResponseContentRead;
         private static readonly Dictionary<Type, Dictionary<Type, DataContractSerializer>> s_globalSerializerCache = new Dictionary<Type, Dictionary<Type, DataContractSerializer>>();
         private static readonly DataContractSerializer s_faultSerializer = new DataContractSerializer(typeof(DomainServiceFault));
-        Dictionary<Type, DataContractSerializer> _serializerCache;
+        readonly Dictionary<Type, DataContractSerializer> _serializerCache;
 
         public BinaryHttpDomainClient(HttpClient httpClient, Type serviceInterface)
         {
@@ -185,12 +190,12 @@ namespace OpenRiaServices.Client.HttpDomainClient
             CancellationToken cancellationToken)
         {
             Task<HttpResponseMessage> response = null;
-            // Add parameters to query string for get methods
+
             if (!hasSideEffects)
             {
                 response = GetAsync(operationName, parameters, queryOptions, cancellationToken);
             }
-            // It is a POST
+            // It is a POST, or GET returned null (maybe due to too large request uri)
             if (response == null)
             {
                 response = PostAsync(operationName, parameters, queryOptions, cancellationToken);
@@ -213,7 +218,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
             {
                 Content = new BinaryXmlContent(this, operationName, parameters, queryOptions),
             };
-            return HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            
+            return HttpClient.SendAsync(request, DefaultHttpCompletionOption, cancellationToken);
         }
 
         /// <summary>
@@ -239,7 +245,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
                     uriBuilder.Append("=");
                     if (param.Value != null)
                     {
-                        var value = QueryStringConverter.ConvertValueToString(param.Value, param.Value.GetType());
+                        var value = WebQueryStringConverter.ConvertValueToString(param.Value, param.Value.GetType());
                         uriBuilder.Append(Uri.EscapeDataString(value));
                     }
                 }
@@ -259,7 +265,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
 
             // TODO: Switch to POST if uri becomes to long, we can do so by returning nul ...l
             var uri = uriBuilder.ToString();
-            return HttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            return HttpClient.GetAsync(uri, DefaultHttpCompletionOption, cancellationToken);
         }
         #endregion
 
@@ -335,8 +341,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
         {
             // localName should be operationName + postfix
             if (!(reader.LocalName.Length == operationName.Length + postfix.Length
-                && reader.LocalName.StartsWith(operationName)
-                && reader.LocalName.EndsWith(postfix)))
+                && reader.LocalName.StartsWith(operationName, StringComparison.Ordinal)
+                && reader.LocalName.EndsWith(postfix, StringComparison.Ordinal)))
             {
                 throw new DomainOperationException(
                     string.Format(Resources.DomainClient_UnexpectedResultContent, operationName + postfix, reader.LocalName)
