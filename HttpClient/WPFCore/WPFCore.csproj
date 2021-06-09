@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net5.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>HttpClientExampleClient</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenRiaServices.Client.Core" Version="5.0.0" />
+    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HttpClientExampleClient.Core\HttpClientExampleClient.Core.csproj" />
+    <ProjectReference Include="..\OpenRiaServices.Client.HttpDomainClient\OpenRiaServices.Client.HttpDomainClient.csproj" />
+  </ItemGroup>
+
+</Project>

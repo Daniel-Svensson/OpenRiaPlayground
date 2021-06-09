@@ -39,6 +39,7 @@ namespace HttpClientExampleClient
                 {
                     AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip,
                     WindowsProxyUsePolicy = WindowsProxyUsePolicy.UseWinInetProxy,
+                 
                 },
                 ServerBaseUri = new Uri("https://localhost:44300/ClientBin/", UriKind.Absolute)
             };

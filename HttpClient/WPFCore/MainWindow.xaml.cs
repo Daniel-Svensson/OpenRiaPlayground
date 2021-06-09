@@ -5,6 +5,8 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using TestDomainServices;
@@ -233,12 +235,18 @@ namespace HttpClientExampleClient
 
         private void OpenRiaWeb_Click(object sender, RoutedEventArgs e)
         {
-            DomainContext.DomainClientFactory = new OpenRiaServices.Client.Web.WebDomainClientFactory()
-            {
-                ServerBaseUri = GetServerBaseUri(),
-                CookieContainer = _cookieContainer,
-            };
+            throw new NotImplementedException();
             SetupNewDomainContext();
+        }
+
+        class UseHttp2Handler : DelegatingHandler
+        {
+            public UseHttp2Handler(HttpMessageHandler inner) : base(inner) { }
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                request.Version = HttpVersion.Version20;
+                return base.SendAsync(request, cancellationToken);
+            }
         }
 
         private void OpenRiaPortableWeb_Click(object sender, RoutedEventArgs e)
@@ -246,12 +254,12 @@ namespace HttpClientExampleClient
             DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
-                HttpMessageHandler = new HttpClientHandler()
+                HttpMessageHandler = new UseHttp2Handler(new HttpClientHandler()
                 {
                     CookieContainer = _cookieContainer,
                     UseCookies = true,
                     AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
-                }
+                })
             };
             SetupNewDomainContext();
         }
@@ -272,7 +280,7 @@ namespace HttpClientExampleClient
             DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
             {
                 ServerBaseUri = GetServerBaseUri(),
-                HttpMessageHandler = new Http2CustomHandler()
+                HttpMessageHandler = new WinHttpHandler()
                 {
                     CookieContainer = _cookieContainer,
                     CookieUsePolicy = CookieUsePolicy.UseSpecifiedCookieContainer,

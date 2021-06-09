@@ -13,7 +13,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
             : this(new HttpClientHandler()
             {
                 CookieContainer = new System.Net.CookieContainer(),
-                UseCookies = true
+                UseCookies = true, 
+                 AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip,
             })
         {
         }
