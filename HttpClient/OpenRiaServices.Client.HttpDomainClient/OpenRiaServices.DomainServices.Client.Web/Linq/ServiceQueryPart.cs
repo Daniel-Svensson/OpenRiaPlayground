@@ -13,7 +13,7 @@ namespace OpenRiaServices.Client
     /// <summary>
     /// Represents a single query operator to be applied to a query
     /// </summary>
-    public class ServiceQueryPart
+    class ServiceQueryPart
     {
         private string _queryOperator;
         private string _expression;

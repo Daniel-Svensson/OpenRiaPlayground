@@ -15,7 +15,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
     // TODO: Extract serialization to separate class (hierarchy) Serializer / SerializerCache
     // Pass in HttpDomainClientFactory to ctor,
     // pass in HttpClient ?
-    public partial class BinaryHttpDomainClient : DomainClient
+    internal partial class BinaryHttpDomainClient : DomainClient
     {
         /// ResponseContentRead seems to give better results on .Net framework for local network with low latency and high bandwidth
         /// This is probably due to less kernel time
@@ -26,6 +26,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
         private static readonly Dictionary<Type, Dictionary<Type, DataContractSerializer>> s_globalSerializerCache = new Dictionary<Type, Dictionary<Type, DataContractSerializer>>();
         private static readonly DataContractSerializer s_faultSerializer = new DataContractSerializer(typeof(DomainServiceFault));
         readonly Dictionary<Type, DataContractSerializer> _serializerCache;
+
+        public override bool SupportsCancellation => true;
 
         public BinaryHttpDomainClient(HttpClient httpClient, Type serviceInterface)
         {
@@ -424,7 +426,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
         /// </summary>
         /// <param name="type">type which should be serializable.</param>
         /// <returns>A <see cref="DataContractSerializer"/> which can be used to serialize the type</returns>
-        private DataContractSerializer GetSerializer(Type type)
+        internal DataContractSerializer GetSerializer(Type type)
         {
             DataContractSerializer serializer;
             lock (_serializerCache)
