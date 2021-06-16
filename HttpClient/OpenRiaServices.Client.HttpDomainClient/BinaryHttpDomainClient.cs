@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OpenRiaServices.Client.Internal;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -220,7 +221,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
             {
                 Content = new BinaryXmlContent(this, operationName, parameters, queryOptions),
             };
-            
+
             return HttpClient.SendAsync(request, DefaultHttpCompletionOption, cancellationToken);
         }
 
@@ -261,12 +262,20 @@ namespace OpenRiaServices.Client.HttpDomainClient
                     uriBuilder.Append(i++ == 0 ? "?$" : "&$");
                     uriBuilder.Append(queryPart.QueryOperator);
                     uriBuilder.Append("=");
-                    uriBuilder.Append(Uri.EscapeDataString(queryPart.Expression));
+                    // Query strings seems to be double encoded
+                    uriBuilder.Append(Uri.EscapeDataString(Uri.EscapeDataString(queryPart.Expression)));
                 }
             }
 
-            // TODO: Switch to POST if uri becomes to long, we can do so by returning nul ...l
             var uri = uriBuilder.ToString();
+            // TODO: Switch to POST if uri becomes to long, we can do so by returning nul ...l
+            if (uri.Length > 2048)
+                return null;
+            if (HttpClient.BaseAddress.OriginalString.Length
+                + operationName.Length
+                >= 2047)
+                return null;
+
             return HttpClient.GetAsync(uri, DefaultHttpCompletionOption, cancellationToken);
         }
         #endregion
@@ -391,13 +400,21 @@ namespace OpenRiaServices.Client.HttpDomainClient
             FaultCode faultCode;
             FaultReason faultReason;
             List<FaultReasonText> faultReasons = new List<FaultReasonText>();
+            FaultCode subCode = null;
 
             reader.ReadStartElement("Fault"); // <Fault>
             reader.ReadStartElement("Code");  // <Code>
             reader.ReadStartElement("Value"); // <Value>
-            faultCode = new FaultCode(reader.ReadContentAsString());
+            var code = reader.ReadContentAsString();
             reader.ReadEndElement(); // </Value>
+            if (reader.IsStartElement("Subcode"))
+            {
+                reader.ReadStartElement();
+                reader.ReadStartElement("Value");
+                subCode = new FaultCode(reader.ReadContentAsString());
+            }
             reader.ReadEndElement(); // </Code>
+            faultCode = new FaultCode(code, subCode);
 
             reader.ReadStartElement("Reason");
             while (reader.LocalName == "Text")
@@ -433,14 +450,180 @@ namespace OpenRiaServices.Client.HttpDomainClient
             {
                 if (!_serializerCache.TryGetValue(type, out serializer))
                 {
-                    // TODO: ENsure that DateTimeOffset is part of known types 
-                    // Unlike other primitive types, the DateTimeOffset structure is not a known type by default, so it must be manually added to the list of known types.
-                    serializer = new DataContractSerializer(type, EntityTypes);
+                    if (type != typeof(List<ChangeSetEntry>))
+                    {
+                        // optionally we might consider only passing in EntityTypes as knowntypes for queries
+                        serializer = new DataContractSerializer(type, EntityTypes);
+                    }
+                    else
+                    {
+                        // Submit need to be able to serialize all types that are part of entity actions as well
+                        // since the parameters are passed in object arrays
+                        serializer = new DataContractSerializer(type, GetSubmitDataContractSettings());
+                    }
                     _serializerCache.Add(type, serializer);
                 }
             }
 
             return serializer;
+        }
+
+        class SubmitDataContractResolver : DataContractResolver
+        {
+            private readonly HashSet<Type> _knownInterfaces = new HashSet<Type>();
+            private readonly Dictionary<Type, (System.Xml.XmlDictionaryString typeName, System.Xml.XmlDictionaryString typeNamespace)> _knownTypes
+                = new Dictionary<Type, (System.Xml.XmlDictionaryString, System.Xml.XmlDictionaryString)>();
+
+            public void AddInterface(Type type)
+                => _knownInterfaces.Add(type);
+
+            public override Type ResolveName(string typeName, string typeNamespace, Type declaredType, DataContractResolver knownTypeResolver)
+            {
+                return knownTypeResolver.ResolveName(typeName, typeNamespace, declaredType, knownTypeResolver);
+            }
+
+            public override bool TryResolveType(Type type, Type declaredType, DataContractResolver knownTypeResolver, out System.Xml.XmlDictionaryString typeName, out System.Xml.XmlDictionaryString typeNamespace)
+            {
+                if (knownTypeResolver.TryResolveType(type, declaredType, null, out typeName, out typeNamespace))
+                    return true;
+
+
+                // TODO: MAKE THREADSAFE
+                // check if interface is known
+                if (_knownTypes.TryGetValue(type, out var match))
+                {
+                    typeName = match.typeName;
+                    typeNamespace = match.typeNamespace;
+
+                    return true;
+                }
+
+                // Check interfaces, must have one matching interface
+                if (!type.GetInterfaces().Any(i => _knownInterfaces.Contains(i)))
+                    return false;
+
+                string ns;
+                string n;
+
+                var attributes = type.GetCustomAttributes(typeof(DataContractAttribute), false);
+                foreach (DataContractAttribute dataContract in attributes)
+                {
+                    return true;
+                }
+
+                // If array, todo other types of collections
+                //if (type.IsArray)
+                //{
+                //    var elementType = TypeUtility.GetElementType(type);
+                //    TryResolveType(elementType, elementType, knownTypeResolver, out var elementName, out _);
+
+                //    //typeNamespace = @"http://schemas.microsoft.com/2003/10/Serialization/Arrays";
+                //    //typeName = "ArrayOf" + elementName.Value;
+                //    return true;
+                //}
+
+                // if (declaredType.GetCustomAttributes(typeod(DataContractAttribute)))
+
+                typeName = null;
+                typeNamespace = null;
+                return true;
+            }
+        }
+
+        internal DataContractSerializerSettings GetSubmitDataContractSettings()
+        {
+            var resolver = new SubmitDataContractResolver();
+            var visitedTypes = new HashSet<Type>(EntityTypes);
+            var knownTypes = new HashSet<Type>(visitedTypes);
+            var toVisit = new Stack<Type>(knownTypes);
+
+            void AddIfNew(Type t) { if (visitedTypes.Add(t)) toVisit.Push(t); }
+
+            var emptyArray = typeof(Array)
+                .GetMethod("Empty", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+
+            Type getArrayType(Type e)
+                => emptyArray.MakeGenericMethod(e).Invoke(null, Array.Empty<object>()).GetType();
+
+            while (toVisit.Count > 0)
+            {
+                var current = toVisit.Pop();
+
+                // Handle IEnumerable and other interfaces
+                if (current.IsInterface)
+                {
+                    resolver.AddInterface(current);
+                    if (current.IsGenericType)
+                    {
+                        var generic = current.GetGenericTypeDefinition();
+                        if (generic == typeof(IEnumerable<>)
+                            || generic == typeof(IList<>) 
+                            || generic == typeof(ICollection<>))
+                        {
+                            var elementType = current.GenericTypeArguments[0];
+                       //     knownTypes.Add(typeof(List<>).MakeGenericType(elementType));
+                            knownTypes.Add(getArrayType(elementType));
+                        }
+                    }
+                }
+                else if (TypeUtility.IsPredefinedSimpleType(current))
+                {
+                    if (typeof(DateTimeOffset) == current
+                        || current.IsEnum)
+                        knownTypes.Add(current);
+
+                    continue;
+                }
+                else if (TypeUtility.IsPredefinedListType(current))
+                {
+                    knownTypes.Add(current);
+                    continue;
+                }
+                else if (TypeUtility.IsPredefinedDictionaryType(current))
+                {
+                    knownTypes.Add(current);
+                    continue;
+                }
+                else
+                {
+                    knownTypes.Add(current);
+
+                    // Check any derived types to
+                    foreach (KnownTypeAttribute derived in current.GetCustomAttributes(typeof(KnownTypeAttribute), inherit: false))
+                    {
+                        AddIfNew(derived.Type);
+                    }
+
+                    var type = MetaType.GetMetaType(current);
+
+                    // Add any composition types which is not already added
+                    //foreach (var childType in type.ChildTypes)
+                    //    AddIfNew(childType);
+
+                    // Look for complex types
+                    //if (type.HasComplexMembers)
+                    //{
+                    //    foreach (var t in type.DataMembers)
+                    //        if (t.IsComplex)
+                    //            AddIfNew(TypeUtility.GetElementType(t.PropertyType));
+                    //}
+
+                    // Ensure all parameter 
+                    foreach (var entityAction in type.GetEntityActions())
+                    {
+                        var method = current.GetMethod(entityAction.Name);
+                        foreach (var parameter in method.GetParameters())
+                            AddIfNew(parameter.ParameterType);
+                    }
+                }
+            }
+
+            return new DataContractSerializerSettings()
+            {
+                KnownTypes = knownTypes,
+                DataContractResolver = resolver,
+
+            };
         }
         #endregion
     }

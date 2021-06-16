@@ -21,13 +21,14 @@ namespace HttpClientExampleClient
         private void App_Startup(object sender, StartupEventArgs e)
         {
             // Web client 
-            DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory()
-            {
-                HttpMessageHandler = new HttpClientHandler()
+            DomainContext.DomainClientFactory = new BinaryHttpDomainClientFactory(
+                new HttpClientHandler()
                 {
                     UseProxy = true,
                     AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip
-                },
+                }
+            )
+            {
                 ServerBaseUri = new Uri("http://localhost:51359/ClientBin/", UriKind.Absolute)
             };
 
@@ -39,7 +40,7 @@ namespace HttpClientExampleClient
                 {
                     AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip,
                     WindowsProxyUsePolicy = WindowsProxyUsePolicy.UseWinInetProxy,
-                 
+
                 },
                 ServerBaseUri = new Uri("https://localhost:44300/ClientBin/", UriKind.Absolute)
             };

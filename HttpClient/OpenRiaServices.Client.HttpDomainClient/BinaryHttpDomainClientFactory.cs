@@ -36,6 +36,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
         {
             var httpClient = httpClientFactory();
             httpClient.BaseAddress = new Uri(serviceUri.AbsoluteUri + "/binary/", UriKind.Absolute);
+        //    httpClient.DefaultRequestHeaders.Add("Content-Type", "application/msbin1");
 
             return new BinaryHttpDomainClient(httpClient, serviceContract);
         }
