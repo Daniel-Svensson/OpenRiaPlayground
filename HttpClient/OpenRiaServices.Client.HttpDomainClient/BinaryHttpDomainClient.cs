@@ -127,7 +127,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
         /// <returns>
         /// An asynchronous result that identifies this query.
         /// </returns>
-        protected override async Task<QueryCompletedResult> QueryAsyncCore(EntityQuery query, CancellationToken cancellationToken)
+        protected override Task<QueryCompletedResult> QueryAsyncCore(EntityQuery query, CancellationToken cancellationToken)
         {
             List<ServiceQueryPart> queryOptions = query.Query != null ? QuerySerializer.Serialize(query.Query) : null;
 
@@ -141,41 +141,47 @@ namespace OpenRiaServices.Client.HttpDomainClient
                 });
             }
 
-            var response = await ExecuteRequestAsync(query.QueryName, query.HasSideEffects, query.Parameters, queryOptions, cancellationToken)
-                .ConfigureAwait(false);
+            var responseTask = ExecuteRequestAsync(query.QueryName, query.HasSideEffects, query.Parameters, queryOptions, cancellationToken);
+            return QueryAsyncCoreContinuation();
 
-            IEnumerable<ValidationResult> validationErrors = null;
-            try
+            // Move async statemachine to separate func so that 
+            // any exception from query parsing is thrown immediately and not wrapped in task
+            async Task<QueryCompletedResult> QueryAsyncCoreContinuation() 
             {
-                var queryType = typeof(QueryResult<>).MakeGenericType(query.EntityType);
-                var queryResult = (QueryResult)await ReadResponseAsync(response, query.QueryName, queryType)
-                    .ConfigureAwait(false);
-                if (queryResult != null)
+                var response = await responseTask;
+                IEnumerable<ValidationResult> validationErrors = null;
+                try
                 {
-                    return new QueryCompletedResult(
-                        queryResult.GetRootResults().Cast<Entity>(),
-                        queryResult.GetIncludedResults().Cast<Entity>(),
-                        queryResult.TotalCount,
-                        Enumerable.Empty<ValidationResult>());
+                    var queryType = typeof(QueryResult<>).MakeGenericType(query.EntityType);
+                    var queryResult = (QueryResult)await ReadResponseAsync(response, query.QueryName, queryType)
+                        .ConfigureAwait(false);
+                    if (queryResult != null)
+                    {
+                        return new QueryCompletedResult(
+                            queryResult.GetRootResults().Cast<Entity>(),
+                            queryResult.GetIncludedResults().Cast<Entity>(),
+                            queryResult.TotalCount,
+                            Enumerable.Empty<ValidationResult>());
+                    }
                 }
-            }
-            catch (FaultException<DomainServiceFault> fe)
-            {
-                if (fe.Detail.OperationErrors != null)
+                catch (FaultException<DomainServiceFault> fe)
                 {
-                    validationErrors = fe.Detail.GetValidationErrors();
+                    if (fe.Detail.OperationErrors != null)
+                    {
+                        validationErrors = fe.Detail.GetValidationErrors();
+                    }
+                    else
+                    {
+                        throw GetExceptionFromServiceFault(fe.Detail);
+                    }
                 }
-                else
-                {
-                    throw GetExceptionFromServiceFault(fe.Detail);
-                }
-            }
 
-            return new QueryCompletedResult(
-                    Enumerable.Empty<Entity>(),
-                    Enumerable.Empty<Entity>(),
-                /* totalCount */ 0,
-                    validationErrors ?? Enumerable.Empty<ValidationResult>());
+                return new QueryCompletedResult(
+                        Enumerable.Empty<Entity>(),
+                        Enumerable.Empty<Entity>(),
+                    /* totalCount */ 0,
+                        validationErrors ?? Enumerable.Empty<ValidationResult>());
+            }
         }
         #endregion
 
@@ -243,13 +249,19 @@ namespace OpenRiaServices.Client.HttpDomainClient
             {
                 foreach (var param in parameters)
                 {
-                    uriBuilder.Append(i++ == 0 ? '?' : '&');
-                    uriBuilder.Append(Uri.EscapeDataString(param.Key));
-                    uriBuilder.Append("=");
                     if (param.Value != null)
                     {
-                        var value = WebQueryStringConverter.ConvertValueToString(param.Value, param.Value.GetType());
-                        uriBuilder.Append(Uri.EscapeDataString(value));
+                        uriBuilder.Append(i++ == 0 ? '?' : '&');
+                        uriBuilder.Append(Uri.EscapeDataString(param.Key));
+                        uriBuilder.Append("=");
+                        // TODO: We nned to look at using the interface instead
+                        // This is sort of a hack, we should ideally get the parameterType
+                        // null string should be emtpy string, null for other types should be "null"
+                        //if (param.Value != null)
+                        //{
+                            var value = WebQueryStringConverter.ConvertValueToString(param.Value, param.Value.GetType());
+                            uriBuilder.Append(Uri.EscapeDataString(value));
+                        //}
                     }
                 }
             }
@@ -293,7 +305,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
         private async Task<object> ReadResponseAsync(HttpResponseMessage response, string operationName, Type returnType)
         {
             // Always dispose using finally block below  respnse or we can leak connections
-            try
+            using(response)
             {
                 // TODO: OpenRia 5.0 returns different status codes
                 // Need to read content and parse it even if status code is not 200
@@ -310,7 +322,7 @@ namespace OpenRiaServices.Client.HttpDomainClient
                         throw new DomainOperationException(message, OperationErrorStatus.ServerError, (int)response.StatusCode, null);
                 }
 
-                var stream = await response.Content.ReadAsStreamAsync();
+                using (var stream = await response.Content.ReadAsStreamAsync())
                 using (var reader = System.Xml.XmlDictionaryReader.CreateBinaryReader(stream, System.Xml.XmlDictionaryReaderQuotas.Max))
                 {
                     reader.Read();
@@ -326,17 +338,22 @@ namespace OpenRiaServices.Client.HttpDomainClient
                         VerifyReaderIsAtNode(reader, operationName, "Response");
                         reader.ReadStartElement(); // Read to next which should be ****Result
 
+                        if (reader.NodeType == System.Xml.XmlNodeType.EndElement
+                            || reader.IsEmptyElement)
+                            return null;
+
                         // Validate that we are no on ****Result node
                         VerifyReaderIsAtNode(reader, operationName, "Result");
 
                         var serializer = GetSerializer(returnType);
+
+                        // XmlElemtnt returns the "ResultNode" unless we step into the contents
+                        if (returnType == typeof(System.Xml.Linq.XElement))
+                            reader.ReadStartElement();
+
                         return serializer.ReadObject(reader, verifyObjectName: false);
                     }
                 }
-            }
-            finally
-            {
-                response.Dispose();
             }
         }
 
@@ -412,6 +429,8 @@ namespace OpenRiaServices.Client.HttpDomainClient
                 reader.ReadStartElement();
                 reader.ReadStartElement("Value");
                 subCode = new FaultCode(reader.ReadContentAsString());
+                reader.ReadEndElement(); // </Value>
+                reader.ReadEndElement(); // </Subcode>
             }
             reader.ReadEndElement(); // </Code>
             faultCode = new FaultCode(code, subCode);
@@ -468,68 +487,13 @@ namespace OpenRiaServices.Client.HttpDomainClient
             return serializer;
         }
 
-        class SubmitDataContractResolver : DataContractResolver
-        {
-            private readonly HashSet<Type> _knownInterfaces = new HashSet<Type>();
-            private readonly Dictionary<Type, (System.Xml.XmlDictionaryString typeName, System.Xml.XmlDictionaryString typeNamespace)> _knownTypes
-                = new Dictionary<Type, (System.Xml.XmlDictionaryString, System.Xml.XmlDictionaryString)>();
-
-            public void AddInterface(Type type)
-                => _knownInterfaces.Add(type);
-
-            public override Type ResolveName(string typeName, string typeNamespace, Type declaredType, DataContractResolver knownTypeResolver)
-            {
-                return knownTypeResolver.ResolveName(typeName, typeNamespace, declaredType, knownTypeResolver);
-            }
-
-            public override bool TryResolveType(Type type, Type declaredType, DataContractResolver knownTypeResolver, out System.Xml.XmlDictionaryString typeName, out System.Xml.XmlDictionaryString typeNamespace)
-            {
-                if (knownTypeResolver.TryResolveType(type, declaredType, null, out typeName, out typeNamespace))
-                    return true;
-
-
-                // TODO: MAKE THREADSAFE
-                // check if interface is known
-                if (_knownTypes.TryGetValue(type, out var match))
-                {
-                    typeName = match.typeName;
-                    typeNamespace = match.typeNamespace;
-
-                    return true;
-                }
-
-                // Check interfaces, must have one matching interface
-                if (!type.GetInterfaces().Any(i => _knownInterfaces.Contains(i)))
-                    return false;
-
-                string ns;
-                string n;
-
-                var attributes = type.GetCustomAttributes(typeof(DataContractAttribute), false);
-                foreach (DataContractAttribute dataContract in attributes)
-                {
-                    return true;
-                }
-
-                // If array, todo other types of collections
-                //if (type.IsArray)
-                //{
-                //    var elementType = TypeUtility.GetElementType(type);
-                //    TryResolveType(elementType, elementType, knownTypeResolver, out var elementName, out _);
-
-                //    //typeNamespace = @"http://schemas.microsoft.com/2003/10/Serialization/Arrays";
-                //    //typeName = "ArrayOf" + elementName.Value;
-                //    return true;
-                //}
-
-                // if (declaredType.GetCustomAttributes(typeod(DataContractAttribute)))
-
-                typeName = null;
-                typeNamespace = null;
-                return true;
-            }
-        }
-
+        /// <summary>
+        /// Submit need to be able to serialize all types that are part of entity actions as well
+        /// since the parameters are passed in object arrays.
+        /// 
+        /// Find all types which are part of parameters and add them
+        /// </summary>
+        /// <returns></returns>
         internal DataContractSerializerSettings GetSubmitDataContractSettings()
         {
             var resolver = new SubmitDataContractResolver();
@@ -537,83 +501,43 @@ namespace OpenRiaServices.Client.HttpDomainClient
             var knownTypes = new HashSet<Type>(visitedTypes);
             var toVisit = new Stack<Type>(knownTypes);
 
-            void AddIfNew(Type t) { if (visitedTypes.Add(t)) toVisit.Push(t); }
-
-            var emptyArray = typeof(Array)
-                .GetMethod("Empty", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-
-            Type getArrayType(Type e)
-                => emptyArray.MakeGenericMethod(e).Invoke(null, Array.Empty<object>()).GetType();
-
             while (toVisit.Count > 0)
             {
-                var current = toVisit.Pop();
+                var entityType = toVisit.Pop();
 
-                // Handle IEnumerable and other interfaces
-                if (current.IsInterface)
+                // Check any derived types to
+                foreach (KnownTypeAttribute derived in entityType.GetCustomAttributes(typeof(KnownTypeAttribute), inherit: false))
                 {
-                    resolver.AddInterface(current);
-                    if (current.IsGenericType)
+                    if (visitedTypes.Add(derived.Type)) 
+                        toVisit.Push(derived.Type);
+                }
+
+                // Ensure all parameter types are known
+                var metaType = MetaType.GetMetaType(entityType);
+                foreach (var entityAction in metaType.GetEntityActions())
+                {
+                    var method = entityType.GetMethod(entityAction.Name);
+                    foreach (var parameter in method.GetParameters())
                     {
-                        var generic = current.GetGenericTypeDefinition();
-                        if (generic == typeof(IEnumerable<>)
-                            || generic == typeof(IList<>) 
-                            || generic == typeof(ICollection<>))
+                        var type = parameter.ParameterType;
+                        if (visitedTypes.Add(type))
                         {
-                            var elementType = current.GenericTypeArguments[0];
-                       //     knownTypes.Add(typeof(List<>).MakeGenericType(elementType));
-                            knownTypes.Add(getArrayType(elementType));
+                            // Most "primitive types" are already registered
+                            if (TypeUtility.IsPredefinedSimpleType(type))
+                            {
+                                if (typeof(DateTimeOffset) == type || type.IsEnum)
+                                    knownTypes.Add(type);
+                            }
+                            else if (resolver.TryGetEquivalentContractType(type, out var collectionType))
+                            {
+                                knownTypes.Add(collectionType);
+                                // Add elementType too ??
+                            }
+                            else
+                            {
+                                knownTypes.Add(type);
+                            }
                         }
-                    }
-                }
-                else if (TypeUtility.IsPredefinedSimpleType(current))
-                {
-                    if (typeof(DateTimeOffset) == current
-                        || current.IsEnum)
-                        knownTypes.Add(current);
-
-                    continue;
-                }
-                else if (TypeUtility.IsPredefinedListType(current))
-                {
-                    knownTypes.Add(current);
-                    continue;
-                }
-                else if (TypeUtility.IsPredefinedDictionaryType(current))
-                {
-                    knownTypes.Add(current);
-                    continue;
-                }
-                else
-                {
-                    knownTypes.Add(current);
-
-                    // Check any derived types to
-                    foreach (KnownTypeAttribute derived in current.GetCustomAttributes(typeof(KnownTypeAttribute), inherit: false))
-                    {
-                        AddIfNew(derived.Type);
-                    }
-
-                    var type = MetaType.GetMetaType(current);
-
-                    // Add any composition types which is not already added
-                    //foreach (var childType in type.ChildTypes)
-                    //    AddIfNew(childType);
-
-                    // Look for complex types
-                    //if (type.HasComplexMembers)
-                    //{
-                    //    foreach (var t in type.DataMembers)
-                    //        if (t.IsComplex)
-                    //            AddIfNew(TypeUtility.GetElementType(t.PropertyType));
-                    //}
-
-                    // Ensure all parameter 
-                    foreach (var entityAction in type.GetEntityActions())
-                    {
-                        var method = current.GetMethod(entityAction.Name);
-                        foreach (var parameter in method.GetParameters())
-                            AddIfNew(parameter.ParameterType);
                     }
                 }
             }
@@ -622,7 +546,6 @@ namespace OpenRiaServices.Client.HttpDomainClient
             {
                 KnownTypes = knownTypes,
                 DataContractResolver = resolver,
-
             };
         }
         #endregion

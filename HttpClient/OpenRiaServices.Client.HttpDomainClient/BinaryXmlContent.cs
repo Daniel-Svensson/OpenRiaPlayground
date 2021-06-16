@@ -26,49 +26,50 @@ namespace OpenRiaServices.Client.HttpDomainClient
 
         protected override Task SerializeToStreamAsync(Stream stream, TransportContext context)
         {
-            var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(stream);
-
-            // Write message
-            var rootNamespace = "http://tempuri.org/";
-            bool hasQueryOptions = (queryOptions != null && queryOptions.Count > 0);
-
-            if (hasQueryOptions)
+            using (var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(stream, null, null, ownsStream: false))
             {
-                writer.WriteStartElement("MessageRoot");
-                writer.WriteStartElement("QueryOptions");
-                foreach (var queryOption in queryOptions)
+                // Write message
+                var rootNamespace = "http://tempuri.org/";
+                bool hasQueryOptions = (queryOptions != null && queryOptions.Count > 0);
+
+                if (hasQueryOptions)
                 {
-                    writer.WriteStartElement("QueryOption");
-                    writer.WriteAttributeString("Name", queryOption.QueryOperator);
-                    writer.WriteAttributeString("Value", queryOption.Expression);
+                    writer.WriteStartElement("MessageRoot");
+                    writer.WriteStartElement("QueryOptions");
+                    foreach (var queryOption in queryOptions)
+                    {
+                        writer.WriteStartElement("QueryOption");
+                        writer.WriteAttributeString("Name", queryOption.QueryOperator);
+                        writer.WriteAttributeString("Value", queryOption.Expression);
+                        writer.WriteEndElement();
+                    }
                     writer.WriteEndElement();
                 }
-                writer.WriteEndElement();
-            }
-            writer.WriteStartElement(operationName, rootNamespace); // <OperationName>
+                writer.WriteStartElement(operationName, rootNamespace); // <OperationName>
 
-            // Write all parameters
-            if (parameters != null && parameters.Count > 0)
-            {
-                foreach (var param in parameters)
+                // Write all parameters
+                if (parameters != null && parameters.Count > 0)
                 {
-                    writer.WriteStartElement(param.Key);  // <ParameterName>
-                    if (param.Value != null)
+                    foreach (var param in parameters)
                     {
-                        var serializer = domainClient.GetSerializer(param.Value.GetType());
-                        serializer.WriteObjectContent(writer, param.Value);
+                        writer.WriteStartElement(param.Key);  // <ParameterName>
+                        if (param.Value != null)
+                        {
+                            var serializer = domainClient.GetSerializer(param.Value.GetType());
+                            serializer.WriteObjectContent(writer, param.Value);
+                        }
+                        else
+                        {
+                            // Null input
+                            writer.WriteAttributeString("i", "nil", "http://www.w3.org/2001/XMLSchema-instance", "true");
+                        }
+                        writer.WriteEndElement();            // </ParameterName>
                     }
-                    else
-                    {
-                        // Null input
-                        writer.WriteAttributeString("i", "nil", "http://www.w3.org/2001/XMLSchema-instance", "true");
-                    }
-                    writer.WriteEndElement();            // </ParameterName>
                 }
-            }
 
-            writer.WriteEndDocument(); // </OperationName> and </MessageRoot> if present
-            writer.Flush();
+                writer.WriteEndDocument(); // </OperationName> and </MessageRoot> if present
+                writer.Flush();
+            }
 
             return Task.CompletedTask;
         }
