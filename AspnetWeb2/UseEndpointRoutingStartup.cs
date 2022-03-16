@@ -30,7 +30,9 @@ public class UseEndpointRoutingStartup
     public void Configure(IApplicationBuilder app)
     {
         app.UseStaticFiles();
+        //app.UseAuthentication();
         app.UseRouting();
+        //app.UseAuthorization();
         app.UseEndpoints(endpoints =>
         {
          //   endpoints.MapHello("/helloworld", "World");
@@ -43,13 +45,13 @@ public class UseEndpointRoutingStartup
 
                     var sb = new StringBuilder();
                     sb.Append("<html><body>");
-                    sb.AppendLine("Endpoints:");
+                    sb.AppendLine("<p>Endpoints:</p>");
                     foreach (var endpoint in dataSource.Endpoints.OfType<RouteEndpoint>().OrderBy(e => e.RoutePattern.RawText, StringComparer.OrdinalIgnoreCase))
                     {
-                        sb.AppendLine(FormattableString.Invariant($"- <a href=\"{endpoint.RoutePattern.RawText}\">{endpoint.RoutePattern.RawText}</a>"));
+                        sb.AppendLine(FormattableString.Invariant($"- <a href=\"{endpoint.RoutePattern.RawText}\">{endpoint.RoutePattern.RawText}</a><br />"));
                         foreach (var metadata in endpoint.Metadata)
                         {
-                            sb.AppendLine("    " + metadata);
+                            sb.AppendLine("<li>" + metadata + "</li>");
                         }
                     }
 

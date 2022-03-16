@@ -1,15 +1,14 @@
 // ReuqstDelegate
-
-using Microsoft.AspNetCore.Http.Features;
-using OpenRiaServices;
 using OpenRiaServices.Hosting;
 using OpenRiaServices.Hosting.AspNetCore;
 using OpenRiaServices.Hosting.Wcf;
+using OpenRiaServices.Hosting.Wcf.Behaviors;
 using OpenRiaServices.Server;
 using System.Runtime.Serialization;
 
 class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
 {
+    private static readonly WebHttpQueryStringConverter s_queryStringConverter = new();
     private readonly DomainOperationEntry operation;
     private readonly DataContractSerializer serializer;
 
@@ -24,15 +23,14 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
     public async Task Invoke(HttpContext context)
     {
         var domainService = (DomainService)context.RequestServices.GetRequiredService(operation.DomainServiceType);
-        var serviceContext = new DomainServiceContext(context.RequestServices, context.User, DomainOperationType.Query);
-        // serviceContext.CancellationToken = context.RequestAborted;
+        var serviceContext = new AspNetDomainServiceContext(context, DomainOperationType.Query);
         domainService.Initialize(serviceContext);
 
-        var inputs = AllocateInputs();
+        // TODO: consider using ArrayPool<object>.Shared in future
+        var inputs = new object[this.operation.Parameters.Count];
+        SetParametersFromUri(context, inputs);
 
-        BindindInputs(context, inputs);
-
-        // TODO: Try/Catch + write failt
+        // TODO: Try/Catch + write fault
         var result = await InvokeCoreAsync(context, domainService, inputs);
 
         var response = context.Response;
@@ -44,30 +42,9 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
 
     private async Task WriteResponse(HttpContext context, QueryResult<TEntity> result)
     {
-        // TODO: OpenRia 5.0 returns different status codes
-        // Need to read content and parse it even if status code is not 200
-        // It would make sens to one  check content type and only pase on msbin
-        //if (!response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType != "application/msbin1")
-        //{
-        //    var message = string.Format(Resources.DomainClient_UnexpectedHttpStatusCode, (int)response.StatusCode, response.StatusCode);
-
-        //    if (response.StatusCode == HttpStatusCode.BadRequest)
-        //        throw new DomainOperationException(message, OperationErrorStatus.NotSupported, (int)response.StatusCode, null);
-        //    else if (response.StatusCode == HttpStatusCode.Unauthorized)
-        //        throw new DomainOperationException(message, OperationErrorStatus.Unauthorized, (int)response.StatusCode, null);
-        //    else
-        //        throw new DomainOperationException(message, OperationErrorStatus.ServerError, (int)response.StatusCode, null);
-        //}
-
-        var syncIOFeature = context.Features.Get<IHttpBodyControlFeature>();
-        if (syncIOFeature != null)
-        {
-            syncIOFeature.AllowSynchronousIO = true;
-        }
-
-        //var stream = context.Response.Body;
-        var ms = new MemoryStream();
-        using (var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(ms, null, null, ownsStream: true))
+        // TODO: Port BufferManagerStream and related code
+        using var ms = new PooledStream.PooledMemoryStream();
+        using (var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(ms, null, null, ownsStream: false))
         {
             string operationName = operation.Name;
             // <GetQueryableRangeTaskResponse xmlns="http://tempuri.org/">
@@ -77,6 +54,7 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
             writer.WriteXmlnsAttribute("a", "DomainServices");
             writer.WriteXmlnsAttribute("i", "http://www.w3.org/2001/XMLSchema-instance");
 
+            // TODO: XmlElemtnt  support
             //// XmlElemtnt returns the "ResultNode" unless we step into the contents
             //if (returnType == typeof(System.Xml.Linq.XElement))
             //    reader.ReadStartElement();
@@ -87,70 +65,42 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
 
             writer.WriteEndElement(); // ***Response
 
-            writer.WriteEndDocument();
+            //      writer.WriteEndDocument();
             writer.Flush();
             ms.Flush();
         }
 
 
-        if (!ms.TryGetBuffer(out var buffer))
-        {
-            context.Response.ContentLength = 0;
-
-        }
-        else
-        {
-            context.Response.ContentLength = buffer.Count;
-            await context.Response.StartAsync();
-            await context.Response.Body.WriteAsync(buffer);
-            await context.Response.CompleteAsync();
-        }
+        context.Response.ContentLength = ms.Length;
+        var ct = context.RequestAborted;
+        //await context.Response.StartAsync(ct);
+        await context.Response.Body.WriteAsync(ms.ToMemoryUnsafe(), ct);
+        //await context.Response.CompleteAsync();
     }
 
-    private void BindindInputs(HttpContext context, object[] inputs)
+    private void SetParametersFromUri(HttpContext context, object[] inputs)
     {
         var query = context.Request.Query;
         var parameters = operation.Parameters;
 
         for (int i = 0; i < parameters.Count; ++i)
         {
-            // TODO: Convert 
             if (query.TryGetValue(parameters[i].Name, out var values))
             {
                 var value = values.FirstOrDefault();
-                inputs[i] = Convert.ChangeType(value, parameters[i].ParameterType);
+                inputs[i] = s_queryStringConverter.ConvertStringToValue(value, parameters[i].ParameterType);
             }
         }
-    }
-
-    /*protected override */
-    string Name
-    {
-        get
-        {
-            return this.operation.Name;
-        }
-    }
-
-    public /*override*/ object[] AllocateInputs()
-    {
-        return new object[this.operation.Parameters.Count];
     }
 
     protected /*override*/ async ValueTask<QueryResult<TEntity>> InvokeCoreAsync(HttpContext httpContext, DomainService instance, object[] inputs)
     {
         ServiceQuery serviceQuery = null;
         QueryAttribute queryAttribute = (QueryAttribute)this.operation.OperationAttribute;
-        // httpContext is lost on await so need to save it for later ise
-        //  HttpContext httpContext = HttpContext.Current;
 
         if (queryAttribute.IsComposable)
         {
             serviceQuery = GetServiceQuery(httpContext.Request);
-            //if (OperationContext.Current.IncomingMessageProperties.TryGetValue(ServiceQuery.QueryPropertyName, out value))
-            //{
-            //    serviceQuery = (ServiceQuery)value;
-            //}
         }
 
         QueryResult<TEntity> result;

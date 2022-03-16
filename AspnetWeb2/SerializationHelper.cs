@@ -9,7 +9,6 @@ namespace OpenRiaServices.Hosting.AspNetCore
     internal class SerializationHelper
     {       
         private readonly Dictionary<Type, DataContractSerializer> _serializerCache = new Dictionary<Type, DataContractSerializer>();
-        private readonly Type _serviceInterface;
 
         public SerializationHelper()
         {

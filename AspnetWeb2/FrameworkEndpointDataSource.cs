@@ -43,8 +43,10 @@ internal class FrameworkEndpointDataSource : EndpointDataSource, IEndpointConven
     private List<Endpoint> BuildEndpoints()
     {
         List<Endpoint> endpoints = new List<Endpoint>();
+        var getOrPost = new HttpMethodMetadata(new[] { "GET", "POST" });
+        var postOnly = new HttpMethodMetadata(new[] { "POST" });
 
-        foreach(var (name, domainService) in DomainServices)
+        foreach (var (name, domainService) in DomainServices)
         {
             var serializationHelper = new SerializationHelper();
             int order = 1;
@@ -56,18 +58,23 @@ internal class FrameworkEndpointDataSource : EndpointDataSource, IEndpointConven
                     var invoker = (IDomainOperationInvoker)Activator.CreateInstance(typeof(QueryOperationInvoker<>).MakeGenericType(operation.AssociatedType),
                         new object[] { operation, serializationHelper });
 
-                    // TODO: Limit based on GET/PUT
-                    var route = RoutePatternFactory.Parse($"/{name}/{operation.Name}");
-                    var metadata = new EndpointMetadataCollection();
-
-                    var endpoint = new RouteEndpoint(invoker.Invoke, route, order++, null, displayName: $"{name}.{operation.Name}");
+                    var hasSideEffects = ((QueryAttribute)operation.OperationAttribute).HasSideEffects;
                     
+                    var route = RoutePatternFactory.Parse($"/{name}/{operation.Name}");
+                    var metadata = new EndpointMetadataCollection(hasSideEffects ? postOnly : getOrPost);
+
+                    //.RequireAuthorization("AtLeast21")
+                    // TODO: looka at adding authorization and authentication metadata to endpoiunt
+                    // authorization - look for any attribute implementing microsoft.aspnetcore.authorization.iauthorizedata 
+                    // https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.authorization.iauthorizedata?view=aspnetcore-6.0
+
+                    //var aut = operation.Attributes.Cast<Attribute>().OfType<Microsoft.spNetCore.Authorization.IAuthorizeData>().ToList();
+
+                    var endpoint = new RouteEndpoint(invoker.Invoke, route, order++, /*metadata*/ null, displayName: $"{name}.{operation.Name}");
+
                     endpoints.Add(endpoint);
-
-
                 }
             }
-
         }
 
         foreach (var hubMethod in HubMethods)

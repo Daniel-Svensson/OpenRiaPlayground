@@ -19,11 +19,11 @@
   <ItemGroup>
     <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client.Web\Framework\Data\DomainServiceFault.cs" Link="WCF\DomainServiceFault.cs" />
     <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client.Web\Framework\Data\ServiceQueryPart.cs" Link="WCF\ServiceQueryPart.cs" />
-    <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client\Framework\ExceptionHandlingUtility.cs" Link="WCF\ExceptionHandlingUtility.cs" />
     <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client\Framework\QueryResult.cs" Link="WCF\QueryResult.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="PooledStream" Version="0.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
 

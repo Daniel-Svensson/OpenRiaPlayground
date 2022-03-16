@@ -64,7 +64,7 @@ public class Program
             .ConfigureLogging(b =>
             {
                 b.AddConsole();
-                b.SetMinimumLevel(LogLevel.Critical);
+                b.SetMinimumLevel(LogLevel.Information);
             });
     }
 }
