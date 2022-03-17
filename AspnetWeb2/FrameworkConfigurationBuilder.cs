@@ -38,8 +38,8 @@ public class FrameworkConfigurationBuilder
         var longName = type.FullName.Replace('.', '-') + ".svc";
         DomainServiceDescription description = DomainServiceDescription.GetDescription(type);
 
-        _dataSource.DomainServices.Add(longName, description);
-        _dataSource.DomainServices.Add(type.Name, description);
+        _dataSource.DomainServices.Add(longName + "/binary", description);
+        _dataSource.DomainServices.Add(type.Name , description);
     }
 
     internal void AddDomainService(string name, Type type)

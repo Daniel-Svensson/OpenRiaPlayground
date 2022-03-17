@@ -6,41 +6,206 @@ using OpenRiaServices.Hosting.Wcf.Behaviors;
 using OpenRiaServices.Server;
 using System.Runtime.Serialization;
 
-class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
+
+abstract class OperationInvoker
 {
     private static readonly WebHttpQueryStringConverter s_queryStringConverter = new();
-    private readonly DomainOperationEntry operation;
-    private readonly DataContractSerializer serializer;
+    protected readonly DomainOperationEntry operation;
+    private readonly DomainOperationType operationType;
+    protected readonly SerializationHelper serializationHelper;
+    private readonly DataContractSerializer responseSerializer;
 
-    public QueryOperationInvoker(DomainOperationEntry operation, SerializationHelper serializationHelper)
-    //        : base(DomainOperationType.Query)
+    private const string MessageRootElementName = "MessageRoot";
+    private const string QueryOptionsListElementName = "QueryOptions";
+    private const string QueryOptionElementName = "QueryOption";
+    private const string QueryNameAttribute = "Name";
+    private const string QueryValueAttribute = "Value";
+    private const string QueryIncludeTotalCountOption = "includeTotalCount";
+
+
+    public OperationInvoker(DomainOperationEntry operation, DomainOperationType operationType,
+        SerializationHelper serializationHelper,
+        DataContractSerializer responseSerializer)
     {
         this.operation = operation;
-        var knownTypes = DomainServiceDescription.GetDescription(operation.DomainServiceType).EntityKnownTypes;
-        this.serializer = serializationHelper.GetSerializer(typeof(QueryResult<TEntity>), knownTypes.GetValueOrDefault(typeof(TEntity)));
+        this.operationType = operationType;
+        this.serializationHelper = serializationHelper;
+        this.responseSerializer = responseSerializer;
     }
 
-    public async Task Invoke(HttpContext context)
+    public abstract Task Invoke(HttpContext context);
+
+    protected object[] GetParametersFromUri(HttpContext context)
     {
-        var domainService = (DomainService)context.RequestServices.GetRequiredService(operation.DomainServiceType);
-        var serviceContext = new AspNetDomainServiceContext(context, DomainOperationType.Query);
-        domainService.Initialize(serviceContext);
+        var query = context.Request.Query;
+        var parameters = operation.Parameters;
+        var inputs = new object[parameters.Count];
+        for (int i = 0; i < parameters.Count; ++i)
+        {
+            if (query.TryGetValue(parameters[i].Name, out var values))
+            {
+                var value = values.FirstOrDefault();
+                inputs[i] = s_queryStringConverter.ConvertStringToValue(value, parameters[i].ParameterType);
+            }
+        }
 
-        // TODO: consider using ArrayPool<object>.Shared in future
-        var inputs = new object[this.operation.Parameters.Count];
-        SetParametersFromUri(context, inputs);
-
-        // TODO: Try/Catch + write fault
-        var result = await InvokeCoreAsync(context, domainService, inputs);
-
-        var response = context.Response;
-        response.Headers.ContentType = "application/msbin1";
-        response.StatusCode = 200;
-
-        await WriteResponse(context, result);
+        return inputs;
     }
 
-    private async Task WriteResponse(HttpContext context, QueryResult<TEntity> result)
+    protected async Task<(ServiceQuery, object[])> ReadParametersFromBody(HttpContext context)
+    {
+        // TODO: Use arraypool directly instead
+        using var ms = new PooledStream.PooledMemoryStream();
+        var contentLength = context.Request.ContentLength;
+
+        if (contentLength > 0 && contentLength < int.MaxValue)
+            ms.Reserve((int)contentLength);
+        await context.Request.BodyReader.CopyToAsync(ms);
+
+        ServiceQuery serviceQuery = null;
+        object[] values;
+        ms.Seek(0, SeekOrigin.Begin);
+        using (var reader = System.Xml.XmlDictionaryReader.CreateBinaryReader(ms, null, System.Xml.XmlDictionaryReaderQuotas.Max))
+        {
+            reader.MoveToContent();
+
+            bool hasMessageRoot = reader.IsStartElement("MessageRoot");
+            // Check for QueryOptions which is part of message root
+            if (hasMessageRoot)
+            {
+                // Go to the <QueryOptions> node.
+                reader.Read();                                                              // <MessageRoot>
+                reader.ReadStartElement(QueryOptionsListElementName);        // <QueryOptions>
+                serviceQuery = ReadServiceQuery(reader);                     // <QueryOption></QueryOption>
+                                                                             // Go to the starting node of the original message.
+                reader.ReadEndElement();                                                    // </QueryOptions>
+                //reader = XmlDictionaryReader.CreateDictionaryReader(reader.ReadSubtree());  // Remainder of the message
+            }
+
+            values = ReadParameters(reader);
+
+            if (hasMessageRoot)
+                reader.ReadEndElement();
+
+            // Verify at end 
+            if (reader.ReadState != System.Xml.ReadState.EndOfFile)
+                throw new InvalidDataException();
+            return (serviceQuery, values);
+        }
+    }
+    /// Reads the query options from the given reader and returns the resulting service query.
+    /// It assumes that the reader is positioned on a stream containing the query options.
+    /// </summary>
+    /// <param name="reader">Reader to the stream containing the query options.</param>
+    /// <returns>Extracted service query.</returns>
+    internal static ServiceQuery ReadServiceQuery(System.Xml.XmlReader reader)
+    {
+        List<ServiceQueryPart> serviceQueryParts = new List<ServiceQueryPart>();
+        bool includeTotalCount = false;
+        while (reader.IsStartElement(QueryOptionElementName))
+        {
+            string name = reader.GetAttribute(QueryNameAttribute);
+            string value = reader.GetAttribute(QueryValueAttribute);
+            if (name.Equals(QueryIncludeTotalCountOption, StringComparison.OrdinalIgnoreCase))
+            {
+                bool queryOptionValue = false;
+                if (Boolean.TryParse(value, out queryOptionValue))
+                {
+                    includeTotalCount = queryOptionValue;
+                }
+            }
+            else
+            {
+                serviceQueryParts.Add(new ServiceQueryPart { QueryOperator = name, Expression = value });
+            }
+
+            ReadElement(reader);
+        }
+
+        ServiceQuery serviceQuery = new ServiceQuery()
+        {
+            QueryParts = serviceQueryParts,
+            IncludeTotalCount = includeTotalCount
+        };
+        return serviceQuery;
+    }
+
+    private static void ReadElement(System.Xml.XmlReader reader)
+    {
+        if (reader.IsEmptyElement)
+        {
+            reader.Read();
+        }
+        else
+        {
+            reader.Read();
+            reader.ReadEndElement();
+        }
+    }
+
+    private object[] ReadParameters(System.Xml.XmlDictionaryReader reader)
+    {
+        object[] values;
+        if (reader.IsStartElement(operation.Name))
+        {
+            reader.Read();
+
+            var parameters = operation.Parameters;
+            values = new object[parameters.Count];
+            for (int i = 0; i < parameters.Count; ++i)
+            {
+                var parameter = parameters[i];
+                if (!reader.IsStartElement(parameter.Name))
+                    throw new InvalidDataException();
+
+                if (reader.HasAttributes && reader.GetAttribute("nil", "http://www.w3.org/2001/XMLSchema-instance") == "true"
+                    || ((reader.NodeType == System.Xml.XmlNodeType.EndElement || reader.IsEmptyElement)))
+                {
+                    values[i] = null;
+                }
+                else
+                {
+                    // TODO: consider knowtypes ?
+                    var serializer = serializationHelper.GetSerializer(parameter.ParameterType, null);
+                    values[i] = serializer.ReadObject(reader, verifyObjectName: false);
+                }
+            }
+            // TODO: Verify we are at end element ?
+            reader.ReadEndElement(); // operation.Name
+        }
+        else
+        {
+            if (operation.Parameters.Count == 0)
+                values = Array.Empty<object>();
+            else
+                throw new InvalidDataException();
+        }
+
+        return values;
+    }
+
+
+    /// <summary>
+    /// Verifies the reader is at node with LocalName equal to operationName + postfix.
+    /// If the reader is at any other node, then a <see cref="DomainOperationException"/> is thrown
+    /// </summary>
+    /// <param name="reader">The reader.</param>
+    /// <param name="operationName">Name of the operation.</param>
+    /// <param name="postfix">The postfix.</param>
+    /// <exception cref="DomainOperationException">If reader is not at the expected xml element</exception>
+    protected static void VerifyReaderIsAtNode(System.Xml.XmlDictionaryReader reader, string operationName, string postfix)
+    {
+        // localName should be operationName + postfix
+        if (!(reader.LocalName.Length == operationName.Length + postfix.Length
+            && reader.LocalName.StartsWith(operationName, StringComparison.Ordinal)
+            && reader.LocalName.EndsWith(postfix, StringComparison.Ordinal)))
+        {
+            // TODO:
+            throw new InvalidDataException();
+        }
+    }
+
+    protected async Task WriteResponse(HttpContext context, object result)
     {
         // TODO: Port BufferManagerStream and related code
         using var ms = new PooledStream.PooledMemoryStream();
@@ -59,7 +224,7 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
             //if (returnType == typeof(System.Xml.Linq.XElement))
             //    reader.ReadStartElement();
 
-            this.serializer.WriteObjectContent(writer, result);
+            this.responseSerializer.WriteObjectContent(writer, result);
 
             writer.WriteEndElement(); // ***Result
 
@@ -78,31 +243,135 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
         //await context.Response.CompleteAsync();
     }
 
-    private void SetParametersFromUri(HttpContext context, object[] inputs)
+    protected DomainService CreateDomainService(HttpContext context)
     {
-        var query = context.Request.Query;
-        var parameters = operation.Parameters;
+        var domainService = (DomainService)context.RequestServices.GetRequiredService(operation.DomainServiceType);
+        var serviceContext = new AspNetDomainServiceContext(context, this.operationType);
+        domainService.Initialize(serviceContext);
+        return domainService;
+    }
+}
 
-        for (int i = 0; i < parameters.Count; ++i)
-        {
-            if (query.TryGetValue(parameters[i].Name, out var values))
-            {
-                var value = values.FirstOrDefault();
-                inputs[i] = s_queryStringConverter.ConvertStringToValue(value, parameters[i].ParameterType);
-            }
-        }
+class InvokeOperationInvoker : OperationInvoker
+{
+    public InvokeOperationInvoker(DomainOperationEntry operation, SerializationHelper serializationHelper)
+            : base(operation, DomainOperationType.Invoke, serializationHelper, GetRespponseSerializer(operation, serializationHelper))
+    {
     }
 
-    protected /*override*/ async ValueTask<QueryResult<TEntity>> InvokeCoreAsync(HttpContext httpContext, DomainService instance, object[] inputs)
+    private static DataContractSerializer GetRespponseSerializer(DomainOperationEntry operation, SerializationHelper serializationHelper)
     {
-        ServiceQuery serviceQuery = null;
-        QueryAttribute queryAttribute = (QueryAttribute)this.operation.OperationAttribute;
+//        var knownTypes = DomainServiceDescription.GetDescription(operation.DomainServiceType).EntityKnownTypes;
+        return serializationHelper.GetSerializer(operation.ReturnType, null);
+    }
 
-        if (queryAttribute.IsComposable)
+    public override async Task Invoke(HttpContext context)
+    {
+        DomainService domainService = CreateDomainService(context);
+
+        // TODO: consider using ArrayPool<object>.Shared in future
+        object[] inputs;
+        if (context.Request.Method == "GET")
         {
-            serviceQuery = GetServiceQuery(httpContext.Request);
+            inputs = GetParametersFromUri(context);
+        }
+        else // POST
+        {
+            if (context.Request.ContentType != "application/msbin1")
+            {
+                context.Response.StatusCode = 400; // maybe 406 / System.Net.HttpStatusCode.NotAcceptable
+                return;
+            }
+            (_, inputs) = await ReadParametersFromBody(context);
         }
 
+        // TODO: Try/Catch + write fault
+        ServiceInvokeResult invokeResult;
+        //try
+        //{
+//            SetOutputCachingPolicy(httpContext, operation);
+            InvokeDescription invokeDescription = new InvokeDescription(this.operation, inputs);
+            invokeResult = await domainService.InvokeAsync(invokeDescription, domainService.ServiceContext.CancellationToken).ConfigureAwait(false);
+        //}
+        //catch (Exception ex)
+        //{
+        //    if (ex.IsFatal())
+        //    {
+        //        throw;
+        //    }
+        //    ClearOutputCachingPolicy(httpContext);
+        //    throw ServiceUtility.CreateFaultException(ex, disableStackTraces);
+        //}
+
+        if (invokeResult.HasValidationErrors)
+        {
+            throw new NotImplementedException();
+            //throw ServiceUtility.CreateFaultException(invokeResult.ValidationErrors, disableStackTraces);
+        }
+        else
+        {
+            var response = context.Response;
+            response.Headers.ContentType = "application/msbin1";
+            response.StatusCode = 200;
+
+            await WriteResponse(context, invokeResult.Result);
+        }
+
+    }
+}
+
+class QueryOperationInvoker<TEntity> : OperationInvoker, IDomainOperationInvoker
+{
+    public QueryOperationInvoker(DomainOperationEntry operation, SerializationHelper serializationHelper)
+            : base(operation, DomainOperationType.Query, serializationHelper, GetRespponseSerializer(operation, serializationHelper))
+    {
+    }
+
+    private static DataContractSerializer GetRespponseSerializer(DomainOperationEntry operation, SerializationHelper serializationHelper)
+    {
+        var knownTypes = DomainServiceDescription.GetDescription(operation.DomainServiceType).EntityKnownTypes;
+        return serializationHelper.GetSerializer(typeof(QueryResult<TEntity>), knownTypes.GetValueOrDefault(typeof(TEntity)));
+    }
+
+    public override async Task Invoke(HttpContext context)
+    {
+        DomainService domainService = CreateDomainService(context);
+
+        // TODO: consider using ArrayPool<object>.Shared in future
+        object[] inputs;
+        ServiceQuery serviceQuery;
+        if (context.Request.Method == "GET")
+        {
+            inputs = GetParametersFromUri(context);
+
+            QueryAttribute queryAttribute = (QueryAttribute)this.operation.OperationAttribute;
+            serviceQuery = queryAttribute.IsComposable ? GetServiceQuery(context.Request) : null;
+        }
+        else // POST
+        {
+            if (context.Request.ContentType != "application/msbin1")
+            {
+                context.Response.StatusCode = 400; // maybe 406 / System.Net.HttpStatusCode.NotAcceptable
+                return;
+            }
+
+            (serviceQuery, inputs) = await ReadParametersFromBody(context);
+        }
+
+        // TODO: Try/Catch + write fault
+        var result = await InvokeCoreAsync(context, domainService, inputs, serviceQuery);
+
+        var response = context.Response;
+        response.Headers.ContentType = "application/msbin1";
+        response.StatusCode = 200;
+
+        await WriteResponse(context, result);
+    }
+
+
+
+    protected /*override*/ async ValueTask<QueryResult<TEntity>> InvokeCoreAsync(HttpContext httpContext, DomainService instance, object[] inputs, ServiceQuery serviceQuery)
+    {
         QueryResult<TEntity> result;
         try
         {
@@ -127,16 +396,6 @@ class QueryOperationInvoker<TEntity> : IDomainOperationInvoker
         }
 
         return result;
-    }
-
-    protected /*override*/ void ConvertInputs(object[] inputs)
-    {
-        // Handles System.Data.Linq.Binary type, (LINQ to SQL)
-        //for (int i = 0; i < this.operation.Parameters.Count; i++)
-        //{
-        //    DomainOperationParameter parameter = this.operation.Parameters[i];
-        //    inputs[i] = SerializationUtility.GetServerValue(parameter.ParameterType, inputs[i]);
-        //}
     }
 
     // FROM DomainServiceWebHttpBehavior
