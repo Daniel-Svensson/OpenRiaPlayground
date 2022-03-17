@@ -10,22 +10,14 @@ using OpenRiaServices.Server;
 
 internal class FrameworkEndpointDataSource : EndpointDataSource, IEndpointConventionBuilder
 {
-    private readonly RoutePatternTransformer _routePatternTransformer;
     private readonly List<Action<EndpointBuilder>> _conventions;
-
-    public List<RoutePattern> Patterns { get; }
-    public List<HubMethod> HubMethods { get; }
 
     public Dictionary<string, DomainServiceDescription> DomainServices { get; } = new ();
     private List<Endpoint> _endpoints;
 
     public FrameworkEndpointDataSource(RoutePatternTransformer routePatternTransformer)
     {
-        _routePatternTransformer = routePatternTransformer;
         _conventions = new List<Action<EndpointBuilder>>();
-
-        Patterns = new List<RoutePattern>();
-        HubMethods = new List<HubMethod>();
     }
 
     public override IReadOnlyList<Endpoint> Endpoints
@@ -81,36 +73,17 @@ internal class FrameworkEndpointDataSource : EndpointDataSource, IEndpointConven
 
                 //var aut = operation.Attributes.Cast<Attribute>().OfType<Microsoft.spNetCore.Authorization.IAuthorizeData>().ToList();
 
-                var endpoint = new RouteEndpoint(invoker.Invoke, route, order++, /*metadata*/ null, displayName: $"{name}.{operation.Name}");
-                endpoints.Add(endpoint);
-
-            }
-        }
-
-        foreach (var hubMethod in HubMethods)
-        {
-            var requiredValues = new { hub = hubMethod.Hub, method = hubMethod.Method };
-            var order = 1;
-
-            foreach (var pattern in Patterns)
-            {
-                var resolvedPattern = _routePatternTransformer.SubstituteRequiredValues(pattern, requiredValues);
-                if (resolvedPattern == null)
-                {
-                    continue;
-                }
-
                 var endpointBuilder = new RouteEndpointBuilder(
-                    hubMethod.RequestDelegate,
-                    resolvedPattern,
-                    order++);
-                endpointBuilder.DisplayName = $"{hubMethod.Hub}.{hubMethod.Method}";
-
+                    invoker.Invoke,
+                    route,
+                    order++)
+                {
+                    DisplayName = $"{name}.{operation.Name}"
+                };
                 foreach (var convention in _conventions)
                 {
                     convention(endpointBuilder);
                 }
-
                 endpoints.Add(endpointBuilder.Build());
             }
         }
@@ -123,15 +96,8 @@ internal class FrameworkEndpointDataSource : EndpointDataSource, IEndpointConven
         return NullChangeToken.Singleton;
     }
 
-    public void Add(Action<EndpointBuilder> convention)
+    void IEndpointConventionBuilder.Add(Action<EndpointBuilder> convention)
     {
         _conventions.Add(convention);
     }
-}
-
-internal class HubMethod
-{
-    public string Hub { get; set; }
-    public string Method { get; set; }
-    public RequestDelegate RequestDelegate { get; set; }
 }

@@ -207,6 +207,10 @@ abstract class OperationInvoker
 
     protected async Task WriteResponse(HttpContext context, object result)
     {
+        var response = context.Response;
+        response.Headers.ContentType = "application/msbin1";
+        response.StatusCode = 200;
+
         // TODO: Port BufferManagerStream and related code
         using var ms = new PooledStream.PooledMemoryStream();
         using (var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(ms, null, null, ownsStream: false))
@@ -310,17 +314,12 @@ class InvokeOperationInvoker : OperationInvoker
         }
         else
         {
-            var response = context.Response;
-            response.Headers.ContentType = "application/msbin1";
-            response.StatusCode = 200;
-
             await WriteResponse(context, invokeResult.Result);
         }
-
     }
 }
 
-class QueryOperationInvoker<TEntity> : OperationInvoker, IDomainOperationInvoker
+class QueryOperationInvoker<TEntity> : OperationInvoker
 {
     public QueryOperationInvoker(DomainOperationEntry operation, SerializationHelper serializationHelper)
             : base(operation, DomainOperationType.Query, serializationHelper, GetRespponseSerializer(operation, serializationHelper))
@@ -361,9 +360,6 @@ class QueryOperationInvoker<TEntity> : OperationInvoker, IDomainOperationInvoker
         // TODO: Try/Catch + write fault
         var result = await InvokeCoreAsync(context, domainService, inputs, serviceQuery);
 
-        var response = context.Response;
-        response.Headers.ContentType = "application/msbin1";
-        response.StatusCode = 200;
 
         await WriteResponse(context, result);
     }

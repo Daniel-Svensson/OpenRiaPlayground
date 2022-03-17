@@ -8,7 +8,7 @@
 
 public static class FrameworkEndpointRouteBuilderExtensions
 {
-    public static IEndpointConventionBuilder MapFramework(this IEndpointRouteBuilder endpoints, Action<FrameworkConfigurationBuilder> configure)
+    public static IEndpointConventionBuilder MapOpenRiaServices(this IEndpointRouteBuilder endpoints, Action<FrameworkConfigurationBuilder> configure)
     {
         if (endpoints == null)
         {

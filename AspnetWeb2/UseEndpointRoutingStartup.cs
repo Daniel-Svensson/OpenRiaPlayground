@@ -91,15 +91,8 @@ public class UseEndpointRoutingStartup
 
             endpoints.Map("/getwithattributes", Handler);
 
-            endpoints.MapFramework(frameworkBuilder =>
+            endpoints.MapOpenRiaServices(frameworkBuilder =>
             {
-                frameworkBuilder.AddPattern("/transform/{hub=TestHub}/{method=TestMethod}");
-                frameworkBuilder.AddPattern("/{hub}/{method=TestMethod}");
-
-                frameworkBuilder.AddHubMethod("TestHub", "TestMethod", context => context.Response.WriteAsync("TestMethod!"));
-                frameworkBuilder.AddHubMethod("Login", "Authenticate", context => context.Response.WriteAsync("Authenticate!"));
-                frameworkBuilder.AddHubMethod("Login", "Logout", context => context.Response.WriteAsync("Logout!"));
-
                 //frameworkBuilder.AddDomainService("WeatherForecastService", typeof(AspnetWeb2.Services.WeatherForecastService));
                 frameworkBuilder.AddDomainService(typeof(AspnetWeb2.Services.WeatherForecastService));
                 frameworkBuilder.AddDomainService(typeof(TestDomainServices.ServerSideAsyncDomainService));
