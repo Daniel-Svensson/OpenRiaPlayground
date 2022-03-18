@@ -1,9 +1,12 @@
 // ReuqstDelegate
+using OpenRiaServices;
 using OpenRiaServices.Hosting;
 using OpenRiaServices.Hosting.AspNetCore;
 using OpenRiaServices.Hosting.Wcf;
 using OpenRiaServices.Hosting.Wcf.Behaviors;
 using OpenRiaServices.Server;
+using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Runtime.Serialization;
 
 
@@ -22,6 +25,7 @@ abstract class OperationInvoker
     private const string QueryValueAttribute = "Value";
     private const string QueryIncludeTotalCountOption = "includeTotalCount";
 
+    private static readonly DataContractSerializer s_faultSerialiser = new DataContractSerializer(typeof(DomainServiceFault));
 
     public OperationInvoker(DomainOperationEntry operation, DomainOperationType operationType,
         SerializationHelper serializationHelper,
@@ -32,6 +36,8 @@ abstract class OperationInvoker
         this.serializationHelper = serializationHelper;
         this.responseSerializer = responseSerializer;
     }
+
+    public virtual string Name => operation.Name;
 
     public abstract Task Invoke(HttpContext context);
 
@@ -54,7 +60,9 @@ abstract class OperationInvoker
 
     protected async Task<(ServiceQuery, object[])> ReadParametersFromBody(HttpContext context)
     {
-        // TODO: Use arraypool directly instead
+        // TODO: determine if settings for max length etc (timings) for DOS protection is needed (or if it should be set on kestrel etc)
+
+        // TODO: Use arraypool or similar instead ?
         using var ms = new PooledStream.PooledMemoryStream();
         var contentLength = context.Request.ContentLength;
 
@@ -130,7 +138,7 @@ abstract class OperationInvoker
         return serviceQuery;
     }
 
-    private static void ReadElement(System.Xml.XmlReader reader)
+    protected static void ReadElement(System.Xml.XmlReader reader)
     {
         if (reader.IsEmptyElement)
         {
@@ -143,7 +151,7 @@ abstract class OperationInvoker
         }
     }
 
-    private object[] ReadParameters(System.Xml.XmlDictionaryReader reader)
+    protected virtual object[] ReadParameters(System.Xml.XmlDictionaryReader reader)
     {
         object[] values;
         if (reader.IsStartElement(operation.Name))
@@ -205,12 +213,85 @@ abstract class OperationInvoker
         }
     }
 
+    protected Task WriteError(HttpContext context, IEnumerable<ValidationResult> validationErrors, bool hideStackTrace)
+    {
+        var errors = validationErrors.Select(ve => new ValidationResultInfo(ve.ErrorMessage, ve.MemberNames)).ToList();
+
+        // if custom errors is turned on, clear out the stacktrace.
+        foreach (ValidationResultInfo error in errors)
+        {
+            if (hideStackTrace)
+            {
+                error.StackTrace = null;
+            }
+        }
+
+        return WriteError(context, new DomainServiceFault { OperationErrors = errors });
+    }
+
+
+    /// <summary>
+    /// Transforms the specified exception as appropriate into a fault message that can be sent
+    /// back to the client.
+    /// </summary>
+    /// <param name="ex">The exception that was caught.</param>
+    /// <param name="hideStackTrace">same as <see cref="HttpContext.IsCustomErrorEnabled"/> <c>true</c> means dont send stack traces</param>
+    /// <returns>The exception to return.</returns>
+    protected Task WriteError(HttpContext context, Exception ex, bool hideStackTrace)
+    {
+        var fault = ServiceUtility.CreateFaultException(ex, hideStackTrace);
+        return WriteError(context, fault);
+    }
+
+    protected async Task WriteError(HttpContext context, DomainServiceFault fault)
+    {
+        var ct = context.RequestAborted;
+        ct.ThrowIfCancellationRequested();
+
+        using var ms = new PooledStream.PooledMemoryStream();
+        using (var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(ms, null, null, ownsStream: false))
+        {
+            //<Fault xmlns="http://schemas.microsoft.com/ws/2005/05/envelope/none">
+            writer.WriteStartElement("Fault", "http://schemas.microsoft.com/ws/2005/05/envelope/none");
+            //<Code><Value>Sender</Value></Code>
+            writer.WriteStartElement("Code");
+            writer.WriteStartElement("Value");
+            writer.WriteString("Sender");
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+            //<Reason ><Text xml:lang="en-US">Access to operation 'GetRangeWithNotAuthorized' was denied.</Text></Reason>
+            writer.WriteStartElement("Reason");
+            writer.WriteStartElement("Text");
+            writer.WriteAttributeString("xml", "lang", null, CultureInfo.CurrentCulture.Name);
+            writer.WriteString(fault.ErrorMessage);
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+
+            writer.WriteStartElement("Detail");
+            s_faultSerialiser.WriteObject(writer, fault);
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+            writer.WriteEndDocument();
+        }
+
+        var response = context.Response;
+        response.Headers.ContentType = "application/msbin1";
+        response.StatusCode = fault.ErrorCode;
+        response.ContentLength = ms.Length;
+
+        await response.Body.WriteAsync(ms.ToMemoryUnsafe(), ct);
+    }
+
     protected async Task WriteResponse(HttpContext context, object result)
     {
+        var ct = context.RequestAborted;
+        ct.ThrowIfCancellationRequested();
+
         var response = context.Response;
         response.Headers.ContentType = "application/msbin1";
         response.StatusCode = 200;
 
+        // TODO: Allow setting XmlDictionaryWriter quotas for Read/write
         // TODO: Port BufferManagerStream and related code
         using var ms = new PooledStream.PooledMemoryStream();
         using (var writer = System.Xml.XmlDictionaryWriter.CreateBinaryWriter(ms, null, null, ownsStream: false))
@@ -226,7 +307,7 @@ abstract class OperationInvoker
             // TODO: XmlElemtnt  support
             //// XmlElemtnt returns the "ResultNode" unless we step into the contents
             //if (returnType == typeof(System.Xml.Linq.XElement))
-            //    reader.ReadStartElement();
+            //    reader.ReadStartElement();a
 
             this.responseSerializer.WriteObjectContent(writer, result);
 
@@ -241,7 +322,6 @@ abstract class OperationInvoker
 
 
         context.Response.ContentLength = ms.Length;
-        var ct = context.RequestAborted;
         //await context.Response.StartAsync(ct);
         await context.Response.Body.WriteAsync(ms.ToMemoryUnsafe(), ct);
         //await context.Response.CompleteAsync();
@@ -256,6 +336,81 @@ abstract class OperationInvoker
     }
 }
 
+class SubmitOperationInvoker : OperationInvoker
+{
+    private DataContractSerializer parameterSerializer;
+
+    public override string Name => "SubmitChanges";
+
+    public SubmitOperationInvoker(DomainOperationEntry operation, SerializationHelper serializationHelper)
+            : base(operation, DomainOperationType.Submit, serializationHelper, GetRespponseSerializer(operation, serializationHelper))
+    {
+        var desc = DomainServiceDescription.GetDescription(operation.DomainServiceType);
+        var knownTypes = desc.EntityKnownTypes;
+
+        // TODO: Look at wcf code for easiest way to do this
+        HashSet<Type> allEntities = new HashSet<Type>(knownTypes.Keys);
+        foreach (var item in knownTypes.Values)
+            allEntities.UnionWith(item);
+
+        this.parameterSerializer = new DataContractSerializer(typeof(List<ChangeSetEntry>), allEntities);
+    }
+
+    private static DataContractSerializer GetRespponseSerializer(DomainOperationEntry operation, SerializationHelper serializationHelper)
+    {
+        var desc = DomainServiceDescription.GetDescription(operation.DomainServiceType);
+        var knownTypes = desc.EntityKnownTypes;
+
+        // TODO: Look at wcf code for easiest way to do this
+        HashSet<Type> allEntities = new HashSet<Type>(knownTypes.Keys);
+        foreach (var item in knownTypes.Values)
+            allEntities.UnionWith(item);
+
+        return serializationHelper.GetSerializer(typeof(IEnumerable<ChangeSetEntry>), allEntities);
+    }
+
+    public override async Task Invoke(HttpContext context)
+    {
+        DomainService domainService = CreateDomainService(context);
+        // Assert post ?
+
+        if (context.Request.ContentType != "application/msbin1")
+        {
+            context.Response.StatusCode = 400; // maybe 406 / System.Net.HttpStatusCode.NotAcceptable
+            return;
+        }
+
+        var (_, inputs) = await ReadParametersFromBody(context);
+
+
+        IEnumerable<ChangeSetEntry> changeSetEntries = (IEnumerable<ChangeSetEntry>)inputs[0];
+
+        try
+        {
+            var result = await ChangeSetProcessor.ProcessAsync(domainService, changeSetEntries);
+            await WriteResponse(context, result);
+        }
+        catch (Exception ex) when (!ex.IsFatal())
+        {
+            await WriteError(context, ex, domainService.GetDisableStackTraces());
+        }
+    }
+
+    protected override object[] ReadParameters(System.Xml.XmlDictionaryReader reader)
+    {
+        reader.ReadStartElement("SubmitChanges");
+        if (!reader.IsStartElement("changeSet"))
+        {
+            // TODO: Reutnr BADREQUEST_data;
+            throw new InvalidDataException();
+        }
+        
+        var changeSet = this.parameterSerializer.ReadObject(reader, verifyObjectName: false);
+        reader.ReadEndElement();
+        return new object[] { changeSet };
+    }
+}
+
 class InvokeOperationInvoker : OperationInvoker
 {
     public InvokeOperationInvoker(DomainOperationEntry operation, SerializationHelper serializationHelper)
@@ -265,7 +420,7 @@ class InvokeOperationInvoker : OperationInvoker
 
     private static DataContractSerializer GetRespponseSerializer(DomainOperationEntry operation, SerializationHelper serializationHelper)
     {
-//        var knownTypes = DomainServiceDescription.GetDescription(operation.DomainServiceType).EntityKnownTypes;
+        //        var knownTypes = DomainServiceDescription.GetDescription(operation.DomainServiceType).EntityKnownTypes;
         return serializationHelper.GetSerializer(operation.ReturnType, null);
     }
 
@@ -291,26 +446,23 @@ class InvokeOperationInvoker : OperationInvoker
 
         // TODO: Try/Catch + write fault
         ServiceInvokeResult invokeResult;
-        //try
-        //{
-//            SetOutputCachingPolicy(httpContext, operation);
+        try
+        {
+            //            SetOutputCachingPolicy(httpContext, operation);
             InvokeDescription invokeDescription = new InvokeDescription(this.operation, inputs);
             invokeResult = await domainService.InvokeAsync(invokeDescription, domainService.ServiceContext.CancellationToken).ConfigureAwait(false);
-        //}
-        //catch (Exception ex)
-        //{
-        //    if (ex.IsFatal())
-        //    {
-        //        throw;
-        //    }
-        //    ClearOutputCachingPolicy(httpContext);
-        //    throw ServiceUtility.CreateFaultException(ex, disableStackTraces);
-        //}
+
+        }
+        catch (Exception ex) when (!ex.IsFatal())
+        {
+            //   ClearOutputCachingPolicy(httpContext);
+            await WriteError(context, ex, hideStackTrace: true);
+            return;
+        }
 
         if (invokeResult.HasValidationErrors)
         {
-            throw new NotImplementedException();
-            //throw ServiceUtility.CreateFaultException(invokeResult.ValidationErrors, disableStackTraces);
+            await WriteError(context, invokeResult.ValidationErrors, hideStackTrace: true);
         }
         else
         {
@@ -357,41 +509,23 @@ class QueryOperationInvoker<TEntity> : OperationInvoker
             (serviceQuery, inputs) = await ReadParametersFromBody(context);
         }
 
-        // TODO: Try/Catch + write fault
-        var result = await InvokeCoreAsync(context, domainService, inputs, serviceQuery);
-
-
-        await WriteResponse(context, result);
-    }
-
-
-
-    protected /*override*/ async ValueTask<QueryResult<TEntity>> InvokeCoreAsync(HttpContext httpContext, DomainService instance, object[] inputs, ServiceQuery serviceQuery)
-    {
         QueryResult<TEntity> result;
         try
         {
             //SetOutputCachingPolicy(httpContext, this.operation);
-            result = await QueryProcessor.ProcessAsync<TEntity>(instance, this.operation, inputs, serviceQuery);
+            result = await QueryProcessor.ProcessAsync<TEntity>(domainService, this.operation, inputs, serviceQuery);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
-            //if (ex.IsFatal())
-            //{
-            //    throw;
-            //}
-            throw;
             //ClearOutputCachingPolicy(httpContext);
-            //throw ServiceUtility.CreateFaultException(ex, disableStackTraces);
+            await WriteError(context, ex, hideStackTrace: true);
+            return;
         }
-
 
         if (result.ValidationErrors != null && result.ValidationErrors.Any())
-        {
-            //         throw ServiceUtility.CreateFaultException(result.ValidationErrors, disableStackTraces);
-        }
-
-        return result;
+            await WriteError(context, result.ValidationErrors, hideStackTrace: true);
+        else
+            await WriteResponse(context, result);
     }
 
     // FROM DomainServiceWebHttpBehavior
