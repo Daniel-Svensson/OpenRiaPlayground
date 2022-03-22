@@ -6,7 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<DefineConstants>$(DefineConstants);SERVERFX</DefineConstants>
 	<SignAssembly>True</SignAssembly>
-	<AssemblyOriginatorKeyFile>C:\Users\danie\source\repos\OpenRiaServices\src\Snk\OpenRiaServices.snk</AssemblyOriginatorKeyFile>
 	  <RootNamespace>OpenRiaServices.Hosting</RootNamespace>
   </PropertyGroup>
 
@@ -17,9 +16,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client.Web\Framework\Data\DomainServiceFault.cs" Link="WCF\DomainServiceFault.cs" />
-    <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client.Web\Framework\Data\ServiceQueryPart.cs" Link="WCF\ServiceQueryPart.cs" />
-    <Compile Include="..\..\OpenRiaServices\src\OpenRiaServices.Client\Framework\QueryResult.cs" Link="WCF\QueryResult.cs" />
+    <Compile Include="..\..\OpenRiaService_Benchmarks\OpenRiaServices.Client.Benchmarks\Server\Cities\Cities.shared.cs" Link="Services\Server\Cities.shared.cs" />
+    <Compile Include="..\..\OpenRiaService_Benchmarks\OpenRiaServices.Client.Benchmarks\Server\Cities\CityData.cs" Link="Services\Server\CityData.cs" />
+    <Compile Include="..\..\OpenRiaService_Benchmarks\OpenRiaServices.Client.Benchmarks\Server\Cities\CityDomainService.cs" Link="Services\Server\CityDomainService.cs" />
+    <Compile Include="..\..\OpenRiaService_Benchmarks\OpenRiaServices.Client.Benchmarks\Server\Cities\CityEntities.cs" Link="Services\Server\CityEntities.cs" />
+    <Compile Include="..\..\OpenRiaService_Benchmarks\OpenRiaServices.Client.Benchmarks\Server\Cities\CityTypes.cs" Link="Services\Server\CityTypes.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,7 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\OpenRiaServices\src\OpenRiaServices.Server\Framework\OpenRiaServices.Server.csproj" />
+    <ProjectReference Include="..\..\OpenRiaServices\src\OpenRiaServices.Hosting.AspNetCore\Framework\OpenRiaServices.Hosting.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\OpenRiaServices\src\OpenRiaServices.Server\Framework\OpenRiaServices.Server.csproj">
+      <Aliases>server,global</Aliases>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -36,17 +40,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="FrameworkEndpointDataSource.cs">
-      <Generator></Generator>
-    </Compile>
-    <Compile Update="Linq\DynamicQueryable.cs">
-      <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
-    </Compile>
-    <Compile Update="Linq\Resource.Designer.cs">
-      <DependentUpon>Resource.resx</DependentUpon>
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-    </Compile>
     <Compile Update="Resource.Designer.cs">
       <DependentUpon>Resource.resx</DependentUpon>
       <DesignTime>True</DesignTime>
@@ -55,16 +48,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Update="Linq\Resource.resx">
-      <CustomToolNamespace>System.Linq.Dynamic</CustomToolNamespace>
-      <LastGenOutput>Resource.Designer.cs</LastGenOutput>
-      <Generator>ResXFileCodeGenerator</Generator>
-    </EmbeddedResource>
     <EmbeddedResource Update="Resource.resx">
       <SubType>Designer</SubType>
       <LastGenOutput>Resource.Designer.cs</LastGenOutput>
       <Generator>ResXFileCodeGenerator</Generator>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Services\Server\" />
   </ItemGroup>
 
 </Project>

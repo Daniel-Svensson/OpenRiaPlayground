@@ -17,41 +17,6 @@ public class Program
     // For unit testing
     public static IHostBuilder GetHostBuilder(string[] args)
     {
-        string scenario;
-        if (args.Length == 0)
-        {
-            Console.WriteLine("Choose a sample to run:");
-            Console.WriteLine($"1. {EndpointRoutingScenario}");
-            Console.WriteLine($"2. {RouterScenario}");
-            Console.WriteLine();
-
-            scenario = "1"; // Console.ReadLine();
-        }
-        else
-        {
-            scenario = args[0];
-        }
-
-        Type startupType;
-        switch (scenario)
-        {
-            case "1":
-            case EndpointRoutingScenario:
-                startupType = typeof(UseEndpointRoutingStartup);
-                break;
-
-            //case "2":
-            //case RouterScenario:
-            //    startupType = typeof(UseRouterStartup);
-            //    break;
-
-            default:
-                Console.WriteLine($"unknown scenario {scenario}");
-                Console.WriteLine($"usage: dotnet run -- ({EndpointRoutingScenario}|{RouterScenario})");
-                throw new InvalidOperationException();
-
-        }
-
         return new HostBuilder()
             .ConfigureWebHost(webHostBuilder =>
             {
@@ -59,12 +24,12 @@ public class Program
                     .UseKestrel()
                     .UseIISIntegration()
                     .UseContentRoot(Environment.CurrentDirectory)
-                    .UseStartup(startupType);
+                    .UseStartup<UseEndpointRoutingStartup>();
             })
             .ConfigureLogging(b =>
             {
                 b.AddConsole();
-                b.SetMinimumLevel(LogLevel.Information);
+                b.SetMinimumLevel(LogLevel.Warning);
             });
     }
 }

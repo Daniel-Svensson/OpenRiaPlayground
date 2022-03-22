@@ -7,6 +7,7 @@
 
 using AspnetWeb2.Services;
 using Microsoft.AspNetCore.Routing.Internal;
+using OpenRiaServices.Client.Benchmarks.Server.Cities;
 using System.Text;
 using TestDomainServices;
 
@@ -23,8 +24,9 @@ public class UseEndpointRoutingStartup
 
         services.AddTransient<WeatherForecastService>();
 
+        services.AddTransient<OpenRiaServices.Client.Benchmarks.Server.Cities.CityDomainService>();
         services.AddTransient<ServerSideAsyncDomainService>();
-        services.AddSingleton<FrameworkEndpointDataSource>();
+        services.AddOpenRiaServices();
     }
 
     public void Configure(IApplicationBuilder app)
@@ -62,17 +64,7 @@ public class UseEndpointRoutingStartup
                     response.ContentType = "text/html";
                     return response.WriteAsync(sb.ToString());
                 });
-            endpoints.MapGet(
-                "/plaintext",
-                (httpContext) =>
-                {
-                    var response = httpContext.Response;
-                    var payloadLength = _plainTextPayload.Length;
-                    response.StatusCode = 200;
-                    response.ContentType = "text/plain";
-                    response.ContentLength = payloadLength;
-                    return response.Body.WriteAsync(_plainTextPayload, 0, payloadLength);
-                });
+
             endpoints.MapGet(
                 "/graph",
                 (httpContext) =>
@@ -87,41 +79,37 @@ public class UseEndpointRoutingStartup
                     return Task.CompletedTask;
                 }).WithDisplayName("DFA Graph");
 
-            endpoints.MapGet("/attributes", HandlerWithAttributes);
-
-            endpoints.Map("/getwithattributes", Handler);
-
-            endpoints.MapOpenRiaServices(frameworkBuilder =>
+             endpoints.MapOpenRiaServices(frameworkBuilder =>
             {
+
+                CityDomainService.GetCitiesResult = CreateValidCities(1).ToList();
+
                 //frameworkBuilder.AddDomainService("WeatherForecastService", typeof(AspnetWeb2.Services.WeatherForecastService));
                 frameworkBuilder.AddDomainService(typeof(AspnetWeb2.Services.WeatherForecastService));
                 frameworkBuilder.AddDomainService(typeof(TestDomainServices.ServerSideAsyncDomainService));
+                frameworkBuilder.AddDomainService(typeof(OpenRiaServices.Client.Benchmarks.Server.Cities.CityDomainService));
             });
         });
 
     }
 
-    [Authorize]
-    private Task HandlerWithAttributes(HttpContext context)
+    public static IEnumerable<OpenRiaServices.Client.Benchmarks.Server.Cities.City> CreateValidCities(int num)
     {
-        return context.Response.WriteAsync("I have ann authorize attribute");
+        for (var i = 0; i < num; i++)
+        {
+            yield return new OpenRiaServices.Client.Benchmarks.Server.Cities.City { Name = "Name" + ToAlphaKey(i), CountyName = "Country", StateName = "SA" };
+        }
     }
-
-    [HttpGet]
-    private Task Handler(HttpContext context)
+    public static string ToAlphaKey(int num)
     {
-        return context.Response.WriteAsync("I have a method metadata attribute");
-    }
+        var sb = new StringBuilder();
+        do
+        {
+            var alpha = (char)('a' + (num % 25));
+            sb.Append(alpha);
+            num /= 25;
+        } while (num > 0);
 
-    private class AuthorizeAttribute : Attribute
-    {
-
-    }
-
-    private class HttpGetAttribute : Attribute, IHttpMethodMetadata
-    {
-        public bool AcceptCorsPreflight => false;
-
-        public IReadOnlyList<string> HttpMethods { get; } = new List<string> { "GET" };
+        return sb.ToString();
     }
 }

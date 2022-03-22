@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.1.32210.238
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenRiaServices.Hosting.AspNetCore", "OpenRiaServices.Hosting.AspNetCore.csproj", "{65B9515B-82A7-43CB-A7A8-54B36005D211}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebApplication", "WebApplication.csproj", "{65B9515B-82A7-43CB-A7A8-54B36005D211}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenRiaServices.Server", "..\..\OpenRiaServices\src\OpenRiaServices.Server\Framework\OpenRiaServices.Server.csproj", "{72100688-B5B2-41F0-830E-605A454633E3}"
 EndProject
@@ -24,6 +24,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Example", "Example", "{10043579-28FD-4223-8F08-4AEC3C264742}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WPFCore", "..\HttpClient\WPFCore\WPFCore.csproj", "{0CDD8FE2-5422-4027-ADB5-8F5EEB4EE509}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenRiaServices.Hosting.AspNetCore", "..\..\OpenRiaServices\src\OpenRiaServices.Hosting.AspNetCore\Framework\OpenRiaServices.Hosting.AspNetCore.csproj", "{B4C07210-48AB-48CE-ADB7-30B86321B66B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebApplication1", "..\WebApplication1\WebApplication1.csproj", "{C0F32192-A9DF-4406-8C13-13604F0E56EE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -105,6 +109,22 @@ Global
 		{0CDD8FE2-5422-4027-ADB5-8F5EEB4EE509}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0CDD8FE2-5422-4027-ADB5-8F5EEB4EE509}.Release|x86.ActiveCfg = Release|Any CPU
 		{0CDD8FE2-5422-4027-ADB5-8F5EEB4EE509}.Release|x86.Build.0 = Release|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Debug|x86.Build.0 = Debug|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Release|x86.ActiveCfg = Release|Any CPU
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B}.Release|x86.Build.0 = Release|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Debug|x86.Build.0 = Debug|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Release|x86.ActiveCfg = Release|Any CPU
+		{C0F32192-A9DF-4406-8C13-13604F0E56EE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -118,6 +138,7 @@ Global
 		{0ED1E081-0879-4BD4-9731-3745BD8F0802} = {10043579-28FD-4223-8F08-4AEC3C264742}
 		{C1535194-9E9D-4D58-A13B-B86C85A1F7DD} = {10043579-28FD-4223-8F08-4AEC3C264742}
 		{0CDD8FE2-5422-4027-ADB5-8F5EEB4EE509} = {10043579-28FD-4223-8F08-4AEC3C264742}
+		{B4C07210-48AB-48CE-ADB7-30B86321B66B} = {052151E9-44F8-4C68-9C67-8CB4A49F1742}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {43BEA345-6AFE-4A55-AE43-64560BE8EFA6}
